@@ -12,8 +12,9 @@ type SearchResponse = { results?: AdzunaApiOffer[] };
 function keywords(query: JobSearchQuery): string[] {
   const jobs = expandJobSearchTerms(query.query);
   const values = jobs.length > 0 ? jobs : [""];
-  if (query.contract === "stage") return values.map((value) => `${value} stage`.trim());
-  if (query.contract === "alternance") {
+  const singleContract = query.contracts.length === 1 ? query.contracts[0] : undefined;
+  if (singleContract === "stage") return values.map((value) => `${value} stage`.trim());
+  if (singleContract === "alternance") {
     return values.map((value) => `${value} alternance`.trim());
   }
   return values;
@@ -33,7 +34,7 @@ async function fetchAdzunaLocation(query: JobSearchQuery, location: string): Pro
   if (searchKeywords.length === 1) url.searchParams.set("what", searchKeywords[0]);
   if (searchKeywords.length > 1) url.searchParams.set("what_or", searchKeywords.join(" "));
   if (location) url.searchParams.set("where", location);
-  if (query.contract === "cdi") url.searchParams.set("permanent", "1");
+  if (query.contracts.length === 1 && query.contracts[0] === "cdi") url.searchParams.set("permanent", "1");
 
   const response = await fetch(url, {
     headers: { Accept: "application/json" },
@@ -48,7 +49,7 @@ async function fetchAdzunaLocation(query: JobSearchQuery, location: string): Pro
   const payload = (await response.json()) as SearchResponse;
   return (payload.results ?? [])
     .map(mapAdzunaOffer)
-    .filter((offer) => query.contract === "all" || offer.contract === query.contract);
+    .filter((offer) => query.contracts.length === 0 || query.contracts.includes(offer.contract));
 }
 
 export async function searchAdzuna(query: JobSearchQuery): Promise<JobOffer[]> {

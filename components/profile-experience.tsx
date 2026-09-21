@@ -3,19 +3,19 @@
 import Link from "next/link";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { analyzeProfile } from "@/lib/profile/analyze-profile";
+import { emptyProfile, inferContactDetails, parseStoredProfile, type ProfileData } from "@/lib/profile/profile-data";
 
 const STORAGE_KEY = "jobpilot-profile-v1";
 
 export function ProfileExperience() {
-  const [cvText, setCvText] = useState("");
+  const [profile, setProfile] = useState<ProfileData>(emptyProfile);
   const [fileName, setFileName] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const analysis = useMemo(() => analyzeProfile(cvText), [cvText]);
+  const analysis = useMemo(() => analyzeProfile(profile.cvText), [profile.cvText]);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) setCvText(saved);
+    setProfile(parseStoredProfile(localStorage.getItem(STORAGE_KEY)));
   }, []);
 
   async function handleFile(event: ChangeEvent<HTMLInputElement>) {
@@ -31,9 +31,11 @@ export function ProfileExperience() {
       const response = await fetch("/api/profile/extract", { method: "POST", body: form });
       const data = (await response.json()) as { text?: string; error?: string };
       if (!response.ok || !data.text) throw new Error(data.error || "CV illisible.");
-      setCvText(data.text);
-      localStorage.setItem(STORAGE_KEY, data.text);
-      setMessage("CV analysé et enregistré dans ce navigateur.");
+      const detected = inferContactDetails(data.text);
+      const nextProfile = { ...profile, ...detected, cvText: data.text, contactConfirmed: false };
+      setProfile(nextProfile);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProfile));
+      setMessage("CV analysé. Vérifiez maintenant vos coordonnées détectées.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Impossible d’analyser le CV.");
     } finally {
@@ -44,9 +46,20 @@ export function ProfileExperience() {
 
   function clearProfile() {
     localStorage.removeItem(STORAGE_KEY);
-    setCvText("");
+    setProfile(emptyProfile);
     setFileName("");
     setMessage("Profil effacé de ce navigateur.");
+  }
+
+  function updateProfile(field: keyof ProfileData, value: string) {
+    setProfile((current) => ({ ...current, [field]: value, contactConfirmed: false }));
+  }
+
+  function confirmContactDetails() {
+    const nextProfile = { ...profile, contactConfirmed: true };
+    setProfile(nextProfile);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProfile));
+    setMessage("Coordonnées confirmées. Elles personnaliseront vos lettres de motivation.");
   }
 
   return (
@@ -69,10 +82,20 @@ export function ProfileExperience() {
           {fileName && <strong className="file-name">{fileName}</strong>}
           {message && <p className="profile-message" role="status">{message}</p>}
           <p className="privacy-note">Le fichier est lu temporairement pour en extraire le texte. Le serveur ne le conserve pas. Le texte reste uniquement dans votre navigateur.</p>
-          {cvText && <button className="text-button danger" type="button" onClick={clearProfile}>Effacer mon profil local</button>}
+          {profile.cvText && <button className="text-button danger" type="button" onClick={clearProfile}>Effacer mon profil local</button>}
         </aside>
 
         <div className="recommendation-panel">
+          {profile.cvText && <section className="identity-confirmation">
+            <div><p className="eyebrow">Identité détectée</p><h2>Ces informations sont-elles correctes ?</h2><p>Corrigez-les si nécessaire, puis confirmez. Elles restent dans ce navigateur.</p></div>
+            <div className="identity-grid">
+              <label><span>Prénom</span><input value={profile.firstName} onChange={(event) => updateProfile("firstName", event.target.value)} placeholder="Votre prénom" /></label>
+              <label><span>Nom</span><input value={profile.lastName} onChange={(event) => updateProfile("lastName", event.target.value)} placeholder="Votre nom" /></label>
+              <label><span>Adresse e-mail</span><input type="email" value={profile.email} onChange={(event) => updateProfile("email", event.target.value)} placeholder="nom@exemple.fr" /></label>
+              <label><span>Téléphone</span><input type="tel" value={profile.phone} onChange={(event) => updateProfile("phone", event.target.value)} placeholder="06 00 00 00 00" /></label>
+            </div>
+            <button className="confirm-profile-button" type="button" onClick={confirmContactDetails}>{profile.contactConfirmed ? "Informations confirmées ✓" : "Confirmer mes informations"}</button>
+          </section>}
           <div className="panel-heading">
             <div><p className="eyebrow">Métiers compatibles</p><h2>Vos pistes recommandées</h2></div>
             {analysis.detectedSkills.length > 0 && <span>{analysis.detectedSkills.length} compétences détectées</span>}

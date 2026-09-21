@@ -1,16 +1,24 @@
 import { matchesExperience } from "./experience";
 import type { JobOffer, JobSearchQuery } from "./types";
 
-const MAX_AGE_MS = 14 * 24 * 60 * 60 * 1_000;
+const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1_000;
 
 export function splitSearchTerms(value: string): string[] {
   return [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))].slice(0, 3);
 }
 
 export function expandJobSearchTerms(value: string): string[] {
-  return [...new Set(splitSearchTerms(value).flatMap((item) =>
+  const baseTerms = splitSearchTerms(value).flatMap((item) =>
     item.split(/\s+(?:&|et)\s+|\s*\/\s*/i).map((part) => part.trim()).filter(Boolean),
-  ))].slice(0, 6);
+  );
+  const aliases = baseTerms.flatMap((term) => {
+    const normalized = term.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    if (normalized.includes("webmaster") || normalized.includes("communication digitale") || normalized.includes("charge de communication") || normalized.includes("assistant de communication")) {
+      return [term, "Webmaster", "Chargé de communication", "Assistant de communication", "Communication digitale", "Community manager"];
+    }
+    return [term];
+  });
+  return [...new Set(aliases)].slice(0, 8);
 }
 
 export function isFreshOffer(offer: Pick<JobOffer, "publishedAt">, now = Date.now()): boolean {
@@ -46,7 +54,7 @@ export function compatibilityScore(offer: JobOffer, query: JobSearchQuery): numb
     score: includesAny(`${offer.location} ${offer.city ?? ""} ${offer.postalCode ?? ""}`, locations) ? 100 : 0,
     weight: 20,
   });
-  if (query.contract !== "all") components.push({ score: offer.contract === query.contract ? 100 : 0, weight: 15 });
+  if (query.contracts.length > 0) components.push({ score: query.contracts.includes(offer.contract) ? 100 : 0, weight: 15 });
   if (query.experience !== "all") components.push({
     score: offer.experienceLevel === "unknown" ? 65 : offer.experienceLevel === query.experience ? 100 : 0,
     weight: 15,
@@ -69,7 +77,7 @@ export function filterAndSortOffers(offers: JobOffer[], query: JobSearchQuery): 
       isFreshOffer(offer) &&
       matchesJob &&
       matchesLocation &&
-      (query.contract === "all" || offer.contract === query.contract) &&
+      (query.contracts.length === 0 || query.contracts.includes(offer.contract)) &&
       matchesExperience(offer.experienceLevel, query.experience)
     );
   }).map((offer) => ({ ...offer, compatibilityScore: compatibilityScore(offer, query) }));

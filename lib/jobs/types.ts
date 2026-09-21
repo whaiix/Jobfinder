@@ -41,7 +41,7 @@ export type JobOffer = RawJobOffer & {
 export type JobSearchQuery = {
   query: string;
   location: string;
-  contract: ContractFilter;
+  contracts: ContractType[];
   experience: ExperienceFilter;
   radius: number;
   limit: number;

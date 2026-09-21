@@ -4,7 +4,7 @@ import {
   type FranceTravailApiOffer,
 } from "../../../jobs/providers/france-travail-mapper";
 import { expandJobSearchTerms, splitSearchTerms } from "../../../jobs/filter-offers";
-import type { ContractFilter, JobOffer, JobSearchQuery } from "../../../jobs/types";
+import type { ContractType, JobOffer, JobSearchQuery } from "../../../jobs/types";
 import { getServerConfig } from "../../config";
 
 type TokenResponse = {
@@ -71,7 +71,7 @@ async function resolveCommuneCode(location: string): Promise<string | null> {
   return communes[0]?.code ?? null;
 }
 
-function keywordForContract(query: string, contract: ContractFilter): string {
+function keywordForContract(query: string, contract?: ContractType): string {
   if (contract === "stage") return `${query} stage`.trim();
   if (contract === "alternance") return `${query} alternance`.trim();
   return query;
@@ -90,9 +90,10 @@ async function fetchVariant(
     url.searchParams.set("commune", communeCode);
     url.searchParams.set("distance", String(query.radius));
   }
-  if (query.contract === "cdi") url.searchParams.set("typeContrat", "CDI");
-  if (query.contract === "cdd") url.searchParams.set("typeContrat", "CDD");
-  url.searchParams.set("range", `0-${Math.min(query.limit * 2, 99)}`);
+  const singleContract = query.contracts.length === 1 ? query.contracts[0] : undefined;
+  if (singleContract === "cdi") url.searchParams.set("typeContrat", "CDI");
+  if (singleContract === "cdd") url.searchParams.set("typeContrat", "CDD");
+  url.searchParams.set("range", `0-${Math.min(query.limit, 49)}`);
 
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
@@ -122,13 +123,13 @@ export async function searchFranceTravail(query: JobSearchQuery): Promise<JobOff
   const batches = await Promise.all(
     effectiveJobs.flatMap((job) =>
       communeCodes.map((communeCode) =>
-        fetchVariant(query, keywordForContract(job, query.contract), communeCode, token),
+        fetchVariant(query, keywordForContract(job, query.contracts.length === 1 ? query.contracts[0] : undefined), communeCode, token),
       ),
     ),
   );
   const deduplicated = new Map(batches.flat().map((offer) => [offer.id, offer]));
 
   return [...deduplicated.values()]
-    .filter((offer) => query.contract === "all" || offer.contract === query.contract)
+    .filter((offer) => query.contracts.length === 0 || query.contracts.includes(offer.contract))
     .slice(0, query.limit * 3);
 }

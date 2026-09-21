@@ -16,20 +16,20 @@ function offer(overrides: Partial<JobOffer> = {}): JobOffer {
 }
 
 const query: JobSearchQuery = {
-  query: "React", location: "Paris", contract: "cdi", experience: "0-1",
+  query: "React", location: "Paris", contracts: ["cdi"], experience: "0-1",
   radius: 30, limit: 50,
 };
 
 describe("offer quality filter", () => {
   it("expands composite recommended job titles", () => {
-    expect(expandJobSearchTerms("Webmaster & Chargé de Communication Digitale")).toEqual([
-      "Webmaster",
-      "Chargé de Communication Digitale",
-    ]);
+    const terms = expandJobSearchTerms("Webmaster & Chargé de Communication Digitale");
+    expect(terms).toContain("Webmaster");
+    expect(terms).toContain("Chargé de communication");
+    expect(terms).toContain("Assistant de communication");
   });
-  it("rejects offers older than fourteen days", () => {
-    expect(isFreshOffer(offer({ publishedAt: "2026-09-08T12:00:00.000Z" }), now)).toBe(true);
-    expect(isFreshOffer(offer({ publishedAt: "2026-09-08T11:59:59.000Z" }), now)).toBe(false);
+  it("rejects offers older than thirty days", () => {
+    expect(isFreshOffer(offer({ publishedAt: "2026-08-23T12:00:00.000Z" }), now)).toBe(true);
+    expect(isFreshOffer(offer({ publishedAt: "2026-08-23T11:59:59.000Z" }), now)).toBe(false);
   });
 
   it("keeps only matching contract, experience, job and location", () => {

@@ -6,12 +6,12 @@ Première étape d’un agrégateur d’offres inspiré du fonctionnement de Pis
 
 - landing page responsive blanche, bleu foncé et bleu électrique ;
 - page de recherche dédiée avec plusieurs métiers et plusieurs villes ;
-- filtres contrat ordonnés CDI, CDD, Alternance, Stage ;
+- sélection simultanée de plusieurs contrats, avec mise à jour automatique ;
 - filtre d'expérience de 0–1 an à 5 ans et plus ;
-- exclusion stricte des offres de plus de 14 jours ;
+- exclusion stricte des offres de plus de 30 jours ;
 - préférences enregistrées dans le navigateur ;
 - aperçu court et fiche complète de chaque annonce ;
-- extraction de mots-clés ATS et proposition de lettre adaptée ;
+- score de compatibilité CV/offre, mots-clés ATS et deux lettres adaptées ;
 - analyse locale du texte du CV et recommandations de métiers ;
 - endpoint local `GET /api/jobs/search` ;
 - connecteur serveur France Travail avec OAuth et géocodage des communes ;
@@ -41,8 +41,8 @@ Un titre ou une description indiquant clairement `Alternance` avec un tag `CDD` 
 
 Le fichier PDF/TXT est envoyé uniquement à la fonction Vercel de l'application pour en extraire
 le texte, sans écriture en base ni stockage de fichier. Le texte extrait est ensuite conservé dans
-le `localStorage` du navigateur afin d'alimenter les recommandations et les lettres. L'utilisateur
-peut l'effacer depuis la page Profil.
+le `localStorage` du navigateur avec les coordonnées confirmées par l’utilisateur, afin d’alimenter
+les recommandations et les lettres. L'utilisateur peut tout effacer depuis la page Profil.
 
 ## Lancer le projet
 
@@ -117,4 +117,4 @@ normalisés y sont enregistrés puis servent de repli. Aucune offre fictive n'es
   scraping. Une intégration nécessitera un accord ou un flux partenaire explicite.
 - **Google** : Google ne fournit plus sa Custom Search JSON API aux nouveaux clients. Le connecteur
   web utilise donc l’API Serper lorsqu’une clé `SERPER_API_KEY` est configurée. Cinq pages sont
-  interrogées et seuls les résultats dont la date est vérifiable et inférieure à 14 jours sont gardés.
+  interrogées et seuls les résultats dont la date est vérifiable et inférieure à 30 jours sont gardés.

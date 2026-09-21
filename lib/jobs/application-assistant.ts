@@ -1,4 +1,5 @@
-import type { JobOffer } from "@/lib/jobs/types";
+import type { JobOffer } from "./types";
+import { profileFullName, type ProfileData } from "../profile/profile-data";
 
 const keywordCatalog = [
   "React", "TypeScript", "JavaScript", "Next.js", "Node.js", "HTML", "CSS",
@@ -29,27 +30,57 @@ export function extractAtsKeywords(offer: JobOffer) {
   return [...new Set([...detected, ...fallback])].slice(0, 12);
 }
 
-export function generateCoverLetter(offer: JobOffer, profileText = "") {
+export function calculateCvCompatibility(offer: JobOffer, profileText: string) {
   const keywords = extractAtsKeywords(offer);
+  if (!profileText.trim()) return Math.min(88, offer.compatibilityScore ?? 70);
   const normalizedProfile = normalize(profileText);
+  const matched = keywords.filter((keyword) => normalizedProfile.includes(normalize(keyword))).length;
+  const profileScore = keywords.length ? 28 + (matched / keywords.length) * 72 : 45;
+  const searchScore = offer.compatibilityScore ?? 70;
+  return Math.max(35, Math.min(96, Math.round(searchScore * 0.55 + profileScore * 0.45)));
+}
+
+function offerHighlights(offer: JobOffer) {
+  const sentences = offer.description.split(/(?<=[.!?])\s+/).map((sentence) => sentence.trim());
+  const numeric = sentences.find((sentence) => /\b\d+[\d.,]*\s*(?:%|ans?|€|k€|mois|jours?)\b/i.test(sentence));
+  const mission = sentences.find((sentence) => /mission|responsabilit|vous (?:serez|aurez|interviendrez|contribuerez)|objectif/i.test(sentence));
+  return { numeric: numeric?.slice(0, 220) ?? "", mission: mission?.slice(0, 220) ?? "" };
+}
+
+export function generateCoverLetters(offer: JobOffer, profile: ProfileData) {
+  const keywords = extractAtsKeywords(offer);
+  const normalizedProfile = normalize(profile.cvText);
   const matchingSkills = keywords.filter((keyword) => normalizedProfile.includes(normalize(keyword)));
   const strengths = (matchingSkills.length ? matchingSkills : keywords).slice(0, 4);
-  const skillsSentence = strengths.length
-    ? `Mon parcours m’a permis de développer des compétences en ${strengths.join(", ")}, directement mobilisables pour les missions décrites.`
-    : "Mon parcours m’a appris à être autonome, rigoureux et à collaborer efficacement autour d’objectifs concrets.";
+  const highlights = offerHighlights(offer);
+  const name = profileFullName(profile);
+  const signature = name ? `Cordialement,\n${name}` : "Cordialement";
+  const skills = strengths.length ? strengths.join(", ") : "l’autonomie, la rigueur et le travail en équipe";
+  const specificDetail = highlights.numeric || highlights.mission;
 
-  return `Objet : Candidature au poste de ${offer.title}
+  const direct = `Objet : Candidature – ${offer.title}
 
 Madame, Monsieur,
 
-Votre offre pour le poste de ${offer.title} chez ${offer.company} a particulièrement retenu mon attention. Les missions présentées correspondent à la suite que je souhaite donner à mon parcours professionnel.
+Je souhaite rejoindre ${offer.company} au poste de ${offer.title}. Mon expérience de ${skills} répond directement aux compétences mises en avant dans votre annonce.
 
-${skillsSentence} Je souhaite mettre ces acquis au service de votre équipe tout en continuant à progresser au contact de vos projets.
+${specificDetail ? `J’ai notamment relevé cet enjeu : « ${specificDetail} » Cette priorité fait écho à ma façon de travailler : partir d’un objectif concret, mesurer l’avancement et livrer un résultat directement exploitable par l’équipe.` : `Les missions décrites demandent une combinaison de maîtrise opérationnelle, d’autonomie et de collaboration que j’ai développée au fil de mon parcours.`}
 
-Motivé par cette opportunité, je serais heureux de vous présenter plus précisément mon expérience et la manière dont je pourrais contribuer aux objectifs de ${offer.company}.
+Je pourrais ainsi contribuer rapidement à vos projets, tout en m’adaptant aux méthodes et aux objectifs propres à ${offer.company}. Je serais heureux d’échanger avec vous sur des exemples précis de réalisations en lien avec vos besoins.
 
-Je vous remercie pour votre attention et reste disponible pour un entretien.
+${signature}`;
 
-Cordialement,
-[Prénom Nom]`;
+  const narrative = `Objet : Envie de contribuer aux projets de ${offer.company}
+
+Madame, Monsieur,
+
+Ce qui m’attire dans votre offre de ${offer.title}, c’est la possibilité de mettre mes compétences au service d’une entreprise et d’une équipe identifiées, plutôt que de candidater à un intitulé générique. La manière dont ${offer.company} présente ce poste laisse apparaître un besoin concret auquel je souhaite contribuer.
+
+Mon parcours m’a permis de construire une base solide autour de ${skills}. ${highlights.mission ? `Votre annonce insiste notamment sur le point suivant : « ${highlights.mission} » C’est précisément le type de responsabilité dans lequel je peux mobiliser mes acquis tout en continuant à progresser.` : `Ces compétences me permettraient d’aborder vos missions avec méthode, curiosité et sens du collectif.`}
+
+Je souhaite vous apporter une implication durable, une communication claire et la capacité à transformer un besoin en actions concrètes. Un entretien me permettrait de comprendre vos priorités actuelles et de vous expliquer comment mon profil pourrait y répondre.
+
+${signature}`;
+
+  return { direct, narrative };
 }

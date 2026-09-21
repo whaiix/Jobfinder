@@ -1,18 +1,19 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
-import { extractAtsKeywords, generateCoverLetter } from "@/lib/jobs/application-assistant";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { calculateCvCompatibility, extractAtsKeywords, generateCoverLetters } from "@/lib/jobs/application-assistant";
 import { getSpontaneousTargets } from "@/lib/jobs/spontaneous";
-import type { ContractFilter, ExperienceFilter, JobOffer } from "@/lib/jobs/types";
+import type { ContractType, ExperienceFilter, JobOffer } from "@/lib/jobs/types";
 import { analyzeProfile } from "@/lib/profile/analyze-profile";
+import { emptyProfile, parseStoredProfile, type ProfileData } from "@/lib/profile/profile-data";
 
 type Props = { initialOffers: JobOffer[] };
 type SearchMeta = { mode: "live" | "database" | "empty"; sources: string[]; warnings: string[] };
-type Preferences = { jobs: string[]; cities: string[]; contract: ContractFilter; experience: ExperienceFilter };
+type Preferences = { jobs: string[]; cities: string[]; contracts: ContractType[]; experience: ExperienceFilter; contract?: ContractType | "all" };
 
 const PREFERENCES_KEY = "jobpilot-search-preferences-v2";
 const PROFILE_KEY = "jobpilot-profile-v1";
-const contractOptions: Array<{ value: ContractFilter; label: string }> = [
+const contractOptions: Array<{ value: ContractType | "all"; label: string }> = [
   { value: "all", label: "Tous" }, { value: "cdi", label: "CDI" },
   { value: "cdd", label: "CDD" }, { value: "alternance", label: "Alternance" },
   { value: "stage", label: "Stage" },
@@ -51,14 +52,18 @@ export function SearchExperience({ initialOffers }: Props) {
   const [cityDraft, setCityDraft] = useState("");
   const [recommendedJobs, setRecommendedJobs] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<"offers" | "spontaneous">("offers");
-  const [contract, setContract] = useState<ContractFilter>("all");
+  const [contracts, setContracts] = useState<ContractType[]>([]);
   const [experience, setExperience] = useState<ExperienceFilter>("all");
+  const [profileData, setProfileData] = useState<ProfileData>(emptyProfile);
   const [offers, setOffers] = useState(initialOffers);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<JobOffer | null>(null);
   const [showAssistant, setShowAssistant] = useState(false);
+  const [letterVersion, setLetterVersion] = useState<"direct" | "narrative">("direct");
   const [copied, setCopied] = useState(false);
+  const assistantRef = useRef<HTMLDivElement>(null);
+  const searchRequestRef = useRef(0);
   const [searchMeta, setSearchMeta] = useState<SearchMeta>({ mode: "empty", sources: [], warnings: [] });
 
   useEffect(() => {
@@ -67,10 +72,12 @@ export function SearchExperience({ initialOffers }: Props) {
       const requestedJob = new URLSearchParams(window.location.search).get("metier");
       if (requestedJob) setJobs([requestedJob]); else if (saved?.jobs) setJobs(saved.jobs);
       if (saved?.cities) setCities(saved.cities);
-      if (saved?.contract) setContract(saved.contract);
+      if (saved?.contracts) setContracts(saved.contracts);
+      else if (saved?.contract && saved.contract !== "all") setContracts([saved.contract]);
       if (saved?.experience) setExperience(saved.experience);
-      const profileText = localStorage.getItem(PROFILE_KEY) || "";
-      setRecommendedJobs(analyzeProfile(profileText).recommendations.slice(0, 3).map((item) => item.title));
+      const profile = parseStoredProfile(localStorage.getItem(PROFILE_KEY));
+      setProfileData(profile);
+      setRecommendedJobs(analyzeProfile(profile.cvText).recommendations.slice(0, 3).map((item) => item.title));
     } catch { /* Une préférence corrompue est simplement ignorée. */ }
   }, []);
 
@@ -101,37 +108,64 @@ export function SearchExperience({ initialOffers }: Props) {
     if (jobs.length < 3) setJobs([...jobs, job]);
   }
 
-  async function search(event?: FormEvent) {
-    event?.preventDefault();
-    const nextJobs = jobDraft.trim() && jobs.length < 3 ? [...jobs, jobDraft.trim()] : jobs;
-    const nextCities = cityDraft.trim() && cities.length < 3 ? [...cities, cityDraft.trim()] : cities;
+  async function runSearch(selection: { jobs: string[]; cities: string[]; contracts: ContractType[]; experience: ExperienceFilter }) {
+    const requestId = ++searchRequestRef.current;
+    const { jobs: nextJobs, cities: nextCities, contracts: nextContracts, experience: nextExperience } = selection;
     setJobs(nextJobs); setCities(nextCities); setJobDraft(""); setCityDraft("");
-    const preferences: Preferences = { jobs: nextJobs, cities: nextCities, contract, experience };
+    const preferences: Preferences = { jobs: nextJobs, cities: nextCities, contracts: nextContracts, experience: nextExperience };
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
     setLoading(true); setHasSearched(true);
-    const params = new URLSearchParams({ q: nextJobs.join(","), location: nextCities.join(","), contract, experience });
+    const params = new URLSearchParams({ q: nextJobs.join(","), location: nextCities.join(","), contract: nextContracts.length ? nextContracts.join(",") : "all", experience: nextExperience, limit: "100" });
     try {
       const response = await fetch(`/api/jobs/search?${params.toString()}`);
       const data = (await response.json()) as { offers: JobOffer[]; meta: SearchMeta };
       if (!response.ok) throw new Error("La recherche n’a pas pu être effectuée.");
-      setOffers(data.offers); setSearchMeta(data.meta);
+      if (requestId !== searchRequestRef.current) return;
+      const scored = data.offers.map((offer) => ({ ...offer, compatibilityScore: calculateCvCompatibility(offer, profileData.cvText) }))
+        .sort((left, right) => (right.compatibilityScore ?? 0) - (left.compatibilityScore ?? 0) || Date.parse(right.publishedAt) - Date.parse(left.publishedAt));
+      setOffers(scored); setSearchMeta(data.meta);
     } catch (error) {
+      if (requestId !== searchRequestRef.current) return;
       setOffers([]); setSearchMeta({ mode: "empty", sources: [], warnings: [error instanceof Error ? error.message : "Erreur de recherche."] });
-    } finally { setLoading(false); }
+    } finally { if (requestId === searchRequestRef.current) setLoading(false); }
   }
 
-  function openOffer(offer: JobOffer) { setSelectedOffer(offer); setShowAssistant(false); setCopied(false); }
+  async function search(event?: FormEvent) {
+    event?.preventDefault();
+    const nextJobs = jobDraft.trim() && jobs.length < 3 ? [...jobs, jobDraft.trim()] : jobs;
+    const nextCities = cityDraft.trim() && cities.length < 3 ? [...cities, cityDraft.trim()] : cities;
+    await runSearch({ jobs: nextJobs, cities: nextCities, contracts, experience });
+  }
+
+  function toggleContract(value: ContractType | "all") {
+    const nextContracts = value === "all" ? [] : contracts.includes(value) ? contracts.filter((item) => item !== value) : [...contracts, value];
+    setContracts(nextContracts);
+    if (hasSearched) void runSearch({ jobs, cities, contracts: nextContracts, experience });
+  }
+
+  function changeExperience(value: ExperienceFilter) {
+    setExperience(value);
+    if (hasSearched) void runSearch({ jobs, cities, contracts, experience: value });
+  }
+
+  function openOffer(offer: JobOffer) { setSelectedOffer(offer); setShowAssistant(false); setLetterVersion("direct"); setCopied(false); }
   const atsKeywords = selectedOffer ? extractAtsKeywords(selectedOffer) : [];
-  const coverLetter = selectedOffer ? generateCoverLetter(selectedOffer, typeof window !== "undefined" ? localStorage.getItem(PROFILE_KEY) || "" : "") : "";
+  const coverLetters = selectedOffer ? generateCoverLetters(selectedOffer, profileData) : { direct: "", narrative: "" };
+  const coverLetter = coverLetters[letterVersion];
 
   async function copyLetter() {
     await navigator.clipboard.writeText(coverLetter); setCopied(true);
   }
 
+  function openAssistant() {
+    setShowAssistant(true);
+    setTimeout(() => assistantRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  }
+
   return (
     <>
       <section className="search-hero">
-        <div><p className="eyebrow">Offres vérifiées et récentes</p><h1>Votre recherche,<br /><span>sans faux positifs.</span></h1><p>Les annonces de plus de 14 jours sont écartées. Le contrat et l’expérience sont aussi contrôlés dans le titre et la description.</p></div>
+        <div><p className="eyebrow">Offres vérifiées et récentes</p><h1>Votre recherche,<br /><span>sans faux positifs.</span></h1><p>Les annonces de plus de 30 jours sont écartées. Le contrat et l’expérience sont aussi contrôlés dans le titre et la description.</p></div>
       </section>
 
       <section className="search-workspace">
@@ -155,9 +189,12 @@ export function SearchExperience({ initialOffers }: Props) {
           </div>
           <div className="filter-row">
             <div className="contract-tabs" aria-label="Type de contrat">
-              {contractOptions.map((option) => <button key={option.value} type="button" className={contract === option.value ? "active" : ""} onClick={() => setContract(option.value)}>{option.label}{option.value !== "all" && hasSearched && <span>{categoryCounts[option.value] ?? 0}</span>}</button>)}
+              {contractOptions.map((option) => {
+                const active = option.value === "all" ? contracts.length === 0 : contracts.includes(option.value);
+                return <button key={option.value} type="button" className={active ? "active" : ""} aria-pressed={active} onClick={() => toggleContract(option.value)}>{option.label}{option.value !== "all" && hasSearched && <span>{categoryCounts[option.value] ?? 0}</span>}</button>;
+              })}
             </div>
-            <label className="select-field"><span>Expérience</span><select value={experience} onChange={(event) => setExperience(event.target.value as ExperienceFilter)}>{experienceOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
+            <label className="select-field"><span>Expérience</span><select value={experience} onChange={(event) => changeExperience(event.target.value as ExperienceFilter)}>{experienceOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
             <button className="primary-button" type="submit" disabled={loading}>{loading ? "Recherche…" : "Rechercher"}</button>
           </div>
           <p className="memory-note">Vos critères sont mémorisés dans ce navigateur pour votre prochaine visite.</p>
@@ -171,7 +208,7 @@ export function SearchExperience({ initialOffers }: Props) {
         {activeView === "offers" ? <>
           <div className="results-header">
             <div><p className="eyebrow">Résultats</p><h2>{hasSearched ? `${offers.length} offre${offers.length > 1 ? "s" : ""} compatible${offers.length > 1 ? "s" : ""}` : "Lancez votre recherche"}</h2></div>
-            <div className="result-notes"><span>14 jours maximum</span><span>{searchMeta.mode === "live" ? `${searchMeta.sources.join(" + ")} en direct` : searchMeta.mode === "database" ? "Résultats enregistrés" : searchMeta.sources.length ? `${searchMeta.sources.join(" + ")} consultés` : "Sources officielles"}</span></div>
+            <div className="result-notes"><span>30 jours maximum</span><span>{searchMeta.mode === "live" ? `${searchMeta.sources.join(" + ")} en direct` : searchMeta.mode === "database" ? "Résultats enregistrés" : searchMeta.sources.length ? `${searchMeta.sources.join(" + ")} consultés` : "Sources officielles"}</span></div>
           </div>
           {searchMeta.warnings.length > 0 && <div className="search-warning" role="status">{searchMeta.warnings.join(" · ")}</div>}
 
@@ -207,9 +244,9 @@ export function SearchExperience({ initialOffers }: Props) {
             <div className="modal-badges"><span className={`contract-badge ${selectedOffer.contract}`}>{selectedOffer.contractLabel}</span><span className="modal-compatibility">{selectedOffer.compatibilityScore ?? 100}% compatible</span><span>{selectedOffer.experienceLabel}</span><span>{selectedOffer.publishedLabel}</span></div>
             <div className="modal-description"><h3>Description du poste</h3><p>{selectedOffer.description}</p></div>
 
-            {showAssistant && <div className="application-assistant"><div className="assistant-heading"><div><p className="eyebrow">Assistant candidature</p><h3>Mots-clés ATS à reprendre naturellement</h3></div></div><div className="ats-keywords">{atsKeywords.map((keyword) => <span key={keyword}>{keyword}</span>)}</div><div className="letter-heading"><h3>Proposition de lettre</h3><button type="button" onClick={copyLetter}>{copied ? "Copiée ✓" : "Copier"}</button></div><pre>{coverLetter}</pre><small>Relisez et personnalisez toujours cette base avec des exemples précis de votre parcours.</small></div>}
+            {showAssistant && <div className="application-assistant" ref={assistantRef}><div className="assistant-heading"><div><p className="eyebrow">Assistant candidature</p><h3>Mots-clés ATS à reprendre naturellement</h3></div></div><div className="ats-keywords">{atsKeywords.map((keyword) => <span key={keyword}>{keyword}</span>)}</div><div className="letter-heading"><h3>Deux versions personnalisées</h3><button type="button" onClick={copyLetter}>{copied ? "Copiée ✓" : "Copier cette version"}</button></div><div className="letter-version-tabs"><button type="button" className={letterVersion === "direct" ? "active" : ""} onClick={() => { setLetterVersion("direct"); setCopied(false); }}>Version directe</button><button type="button" className={letterVersion === "narrative" ? "active" : ""} onClick={() => { setLetterVersion("narrative"); setCopied(false); }}>Version plus personnelle</button></div><pre>{coverLetter}</pre><small>Les éléments chiffrés viennent de l’annonce. Relisez et complétez avec un exemple précis de votre parcours.</small></div>}
 
-            <footer className="modal-footer"><button className="assistant-button" type="button" onClick={() => setShowAssistant(!showAssistant)}>{showAssistant ? "Masquer l’assistant" : "Préparer ma candidature"}</button><a className="primary-link" href={selectedOffer.applyUrl} target="_blank" rel="noreferrer noopener">Voir l’offre originale <span>↗</span></a></footer>
+            <footer className="modal-footer"><button className="assistant-button" type="button" onClick={openAssistant}>{showAssistant ? "Aller à l’assistant" : "Préparer ma candidature"}</button><a className="primary-link" href={selectedOffer.applyUrl} target="_blank" rel="noreferrer noopener">Voir l’offre originale <span>↗</span></a></footer>
           </section>
         </div>
       )}

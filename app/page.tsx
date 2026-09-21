@@ -19,7 +19,7 @@ export default function HomePage() {
             <Link className="secondary-link" href="/profil">Analyser mon CV</Link>
           </div>
           <div className="hero-proof">
-            <span>Offres de moins de 14 jours</span>
+            <span>Offres de moins de 30 jours</span>
             <span>Préférences mémorisées</span>
             <span>Sources officielles</span>
           </div>

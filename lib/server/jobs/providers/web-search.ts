@@ -11,7 +11,7 @@ function buildQuery(query: JobSearchQuery) {
   const locations = splitSearchTerms(query.location);
   const jobPart = jobs.length ? `(${jobs.map((job) => `"${job}"`).join(" OR ")})` : "emploi";
   const locationPart = locations.length ? `(${locations.map((location) => `"${location}"`).join(" OR ")})` : "France";
-  const contractPart = query.contract === "all" ? "" : `"${query.contract}"`;
+  const contractPart = query.contracts.length ? `(${query.contracts.map((contract) => `"${contract}"`).join(" OR ")})` : "";
   return `${jobPart} ${locationPart} ${contractPart} (emploi OR recrutement OR carrière)`.trim();
 }
 
@@ -21,7 +21,7 @@ async function fetchPage(search: string, page: number): Promise<WebSearchResult[
   const response = await fetch(serper.apiBaseUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-API-KEY": serper.apiKey },
-    body: JSON.stringify({ q: search, gl: "fr", hl: "fr", page, num: 10, tbs: "qdr:w2" }),
+    body: JSON.stringify({ q: search, gl: "fr", hl: "fr", page, num: 10, tbs: "qdr:m" }),
     cache: "no-store",
     signal: AbortSignal.timeout(8_000),
   });

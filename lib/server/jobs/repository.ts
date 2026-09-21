@@ -100,7 +100,7 @@ export async function searchStoredOffers(query: JobSearchQuery): Promise<JobOffe
     SELECT *
     FROM job_offers
     WHERE
-      published_at >= NOW() - INTERVAL '14 days'
+      published_at >= NOW() - INTERVAL '30 days'
       AND (expires_at IS NULL OR expires_at >= NOW())
     ORDER BY published_at DESC
     LIMIT 500
