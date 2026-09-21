@@ -3,6 +3,7 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { extractAtsKeywords, generateCoverLetter } from "@/lib/jobs/application-assistant";
 import type { ContractFilter, ExperienceFilter, JobOffer, SortMode } from "@/lib/jobs/types";
+import { analyzeProfile } from "@/lib/profile/analyze-profile";
 
 type Props = { initialOffers: JobOffer[] };
 type SearchMeta = { mode: "live" | "database" | "empty"; sources: string[]; warnings: string[] };
@@ -47,6 +48,7 @@ export function SearchExperience({ initialOffers }: Props) {
   const [cities, setCities] = useState<string[]>([]);
   const [jobDraft, setJobDraft] = useState("");
   const [cityDraft, setCityDraft] = useState("");
+  const [recommendedJobs, setRecommendedJobs] = useState<string[]>([]);
   const [contract, setContract] = useState<ContractFilter>("all");
   const [experience, setExperience] = useState<ExperienceFilter>("all");
   const [sort, setSort] = useState<SortMode>("recent");
@@ -67,6 +69,8 @@ export function SearchExperience({ initialOffers }: Props) {
       if (saved?.contract) setContract(saved.contract);
       if (saved?.experience) setExperience(saved.experience);
       if (saved?.sort) setSort(saved.sort);
+      const profileText = localStorage.getItem(PROFILE_KEY) || "";
+      setRecommendedJobs(analyzeProfile(profileText).recommendations.slice(0, 3).map((item) => item.title));
     } catch { /* Une préférence corrompue est simplement ignorée. */ }
   }, []);
 
@@ -86,6 +90,14 @@ export function SearchExperience({ initialOffers }: Props) {
     const value = draft.replace(/,$/, "").trim();
     if (value && values.length < 3 && !values.some((item) => item.toLowerCase() === value.toLowerCase())) setter([...values, value]);
     clear();
+  }
+
+  function toggleRecommendedJob(job: string) {
+    if (jobs.includes(job)) {
+      setJobs(jobs.filter((item) => item !== job));
+      return;
+    }
+    if (jobs.length < 3) setJobs([...jobs, job]);
   }
 
   async function search(event?: FormEvent) {
@@ -124,7 +136,20 @@ export function SearchExperience({ initialOffers }: Props) {
       <section className="search-workspace">
         <form className="advanced-search" onSubmit={search}>
           <div className="multi-fields">
-            <ChipInput label="Métiers" placeholder="Ex. développeur web" values={jobs} draft={jobDraft} onDraft={setJobDraft} onAdd={() => addValue(jobDraft, jobs, setJobs, () => setJobDraft(""))} onRemove={(value) => setJobs(jobs.filter((item) => item !== value))} />
+            <div>
+              <ChipInput label="Métiers" placeholder="Ex. développeur web" values={jobs} draft={jobDraft} onDraft={setJobDraft} onAdd={() => addValue(jobDraft, jobs, setJobs, () => setJobDraft(""))} onRemove={(value) => setJobs(jobs.filter((item) => item !== value))} />
+              {recommendedJobs.length > 0 && (
+                <div className="recommended-job-picker">
+                  <span>Recommandés depuis votre CV</span>
+                  <div>
+                    {recommendedJobs.map((job) => {
+                      const selected = jobs.includes(job);
+                      return <button key={job} type="button" className={selected ? "selected" : ""} aria-pressed={selected} onClick={() => toggleRecommendedJob(job)} disabled={!selected && jobs.length >= 3}><b>{selected ? "✓" : "+"}</b>{job}</button>;
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
             <ChipInput label="Villes" placeholder="Ex. Paris" values={cities} draft={cityDraft} onDraft={setCityDraft} onAdd={() => addValue(cityDraft, cities, setCities, () => setCityDraft(""))} onRemove={(value) => setCities(cities.filter((item) => item !== value))} />
           </div>
           <div className="filter-row">
