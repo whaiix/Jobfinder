@@ -2,12 +2,12 @@
 
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { extractAtsKeywords, generateCoverLetter } from "@/lib/jobs/application-assistant";
-import type { ContractFilter, ExperienceFilter, JobOffer, SortMode } from "@/lib/jobs/types";
+import type { ContractFilter, ExperienceFilter, JobOffer } from "@/lib/jobs/types";
 import { analyzeProfile } from "@/lib/profile/analyze-profile";
 
 type Props = { initialOffers: JobOffer[] };
 type SearchMeta = { mode: "live" | "database" | "empty"; sources: string[]; warnings: string[] };
-type Preferences = { jobs: string[]; cities: string[]; contract: ContractFilter; experience: ExperienceFilter; sort: SortMode };
+type Preferences = { jobs: string[]; cities: string[]; contract: ContractFilter; experience: ExperienceFilter };
 
 const PREFERENCES_KEY = "jobpilot-search-preferences-v2";
 const PROFILE_KEY = "jobpilot-profile-v1";
@@ -51,7 +51,6 @@ export function SearchExperience({ initialOffers }: Props) {
   const [recommendedJobs, setRecommendedJobs] = useState<string[]>([]);
   const [contract, setContract] = useState<ContractFilter>("all");
   const [experience, setExperience] = useState<ExperienceFilter>("all");
-  const [sort, setSort] = useState<SortMode>("recent");
   const [offers, setOffers] = useState(initialOffers);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -68,7 +67,6 @@ export function SearchExperience({ initialOffers }: Props) {
       if (saved?.cities) setCities(saved.cities);
       if (saved?.contract) setContract(saved.contract);
       if (saved?.experience) setExperience(saved.experience);
-      if (saved?.sort) setSort(saved.sort);
       const profileText = localStorage.getItem(PROFILE_KEY) || "";
       setRecommendedJobs(analyzeProfile(profileText).recommendations.slice(0, 3).map((item) => item.title));
     } catch { /* Une préférence corrompue est simplement ignorée. */ }
@@ -105,10 +103,10 @@ export function SearchExperience({ initialOffers }: Props) {
     const nextJobs = jobDraft.trim() && jobs.length < 3 ? [...jobs, jobDraft.trim()] : jobs;
     const nextCities = cityDraft.trim() && cities.length < 3 ? [...cities, cityDraft.trim()] : cities;
     setJobs(nextJobs); setCities(nextCities); setJobDraft(""); setCityDraft("");
-    const preferences: Preferences = { jobs: nextJobs, cities: nextCities, contract, experience, sort };
+    const preferences: Preferences = { jobs: nextJobs, cities: nextCities, contract, experience };
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
     setLoading(true); setHasSearched(true);
-    const params = new URLSearchParams({ q: nextJobs.join(","), location: nextCities.join(","), contract, experience, sort });
+    const params = new URLSearchParams({ q: nextJobs.join(","), location: nextCities.join(","), contract, experience });
     try {
       const response = await fetch(`/api/jobs/search?${params.toString()}`);
       const data = (await response.json()) as { offers: JobOffer[]; meta: SearchMeta };
@@ -157,7 +155,6 @@ export function SearchExperience({ initialOffers }: Props) {
               {contractOptions.map((option) => <button key={option.value} type="button" className={contract === option.value ? "active" : ""} onClick={() => setContract(option.value)}>{option.label}{option.value !== "all" && hasSearched && <span>{categoryCounts[option.value] ?? 0}</span>}</button>)}
             </div>
             <label className="select-field"><span>Expérience</span><select value={experience} onChange={(event) => setExperience(event.target.value as ExperienceFilter)}>{experienceOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
-            <label className="select-field"><span>Trier par</span><select value={sort} onChange={(event) => setSort(event.target.value as SortMode)}><option value="recent">Plus récentes</option><option value="relevance">Pertinence</option></select></label>
             <button className="primary-button" type="submit" disabled={loading}>{loading ? "Recherche…" : "Rechercher"}</button>
           </div>
           <p className="memory-note">Vos critères sont mémorisés dans ce navigateur pour votre prochaine visite.</p>
@@ -176,7 +173,7 @@ export function SearchExperience({ initialOffers }: Props) {
               <div className="offer-main">
                 <div className="offer-title-row"><div><h3>{offer.title}</h3><p>{offer.company} · {offer.location}</p></div><span className={`contract-badge ${offer.contract}`}>{offer.contractLabel}</span></div>
                 <p className="offer-description">{offer.description}</p>
-                <div className="offer-meta"><span>{offer.publishedLabel}</span><span>{offer.experienceLabel}</span><span>{offer.source}</span>{offer.classificationReason !== "source" && <span className="corrected-label">Contrat vérifié dans l’annonce</span>}</div>
+                <div className="offer-meta"><span className="compatibility-label">{offer.compatibilityScore ?? 100}% compatible</span><span>{offer.publishedLabel}</span><span>{offer.experienceLabel}</span><span>{offer.source}</span>{offer.classificationReason !== "source" && <span className="corrected-label">Contrat vérifié dans l’annonce</span>}</div>
               </div>
               <span className="open-offer">Ouvrir <b>→</b></span>
             </button>
@@ -192,7 +189,7 @@ export function SearchExperience({ initialOffers }: Props) {
             <button className="modal-close" type="button" onClick={() => setSelectedOffer(null)} aria-label="Fermer">×</button>
             <div className="modal-company"><div className="company-logo">{selectedOffer.company.slice(0, 1).toUpperCase()}</div><div><p>{selectedOffer.company}</p><span>{selectedOffer.location}</span></div></div>
             <h2 id="offer-modal-title">{selectedOffer.title}</h2>
-            <div className="modal-badges"><span className={`contract-badge ${selectedOffer.contract}`}>{selectedOffer.contractLabel}</span><span>{selectedOffer.experienceLabel}</span><span>{selectedOffer.publishedLabel}</span></div>
+            <div className="modal-badges"><span className={`contract-badge ${selectedOffer.contract}`}>{selectedOffer.contractLabel}</span><span className="modal-compatibility">{selectedOffer.compatibilityScore ?? 100}% compatible</span><span>{selectedOffer.experienceLabel}</span><span>{selectedOffer.publishedLabel}</span></div>
             <div className="modal-description"><h3>Description du poste</h3><p>{selectedOffer.description}</p></div>
 
             {showAssistant && <div className="application-assistant"><div className="assistant-heading"><div><p className="eyebrow">Assistant candidature</p><h3>Mots-clés ATS à reprendre naturellement</h3></div></div><div className="ats-keywords">{atsKeywords.map((keyword) => <span key={keyword}>{keyword}</span>)}</div><div className="letter-heading"><h3>Proposition de lettre</h3><button type="button" onClick={copyLetter}>{copied ? "Copiée ✓" : "Copier"}</button></div><pre>{coverLetter}</pre><small>Relisez et personnalisez toujours cette base avec des exemples précis de votre parcours.</small></div>}

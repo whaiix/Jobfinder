@@ -1,12 +1,10 @@
 export const contractTypes = ["alternance", "stage", "cdi", "cdd", "interim", "other"] as const;
 export const experienceLevels = ["0-1", "1-3", "3-5", "5+"] as const;
-export const sortModes = ["recent", "relevance"] as const;
 
 export type ContractType = (typeof contractTypes)[number];
 export type ContractFilter = ContractType | "all";
 export type ExperienceLevel = (typeof experienceLevels)[number] | "unknown";
 export type ExperienceFilter = (typeof experienceLevels)[number] | "all";
-export type SortMode = (typeof sortModes)[number];
 export type ClassificationReason = "title" | "source" | "description" | "fallback";
 export type ExperienceReason = "explicit" | "keyword" | "unknown";
 
@@ -36,6 +34,7 @@ export type JobOffer = RawJobOffer & {
   experienceLevel: ExperienceLevel;
   experienceLabel: string;
   experienceReason: ExperienceReason;
+  compatibilityScore?: number;
 };
 
 export type JobSearchQuery = {
@@ -43,7 +42,6 @@ export type JobSearchQuery = {
   location: string;
   contract: ContractFilter;
   experience: ExperienceFilter;
-  sort: SortMode;
   radius: number;
   limit: number;
 };

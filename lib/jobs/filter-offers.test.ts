@@ -17,7 +17,7 @@ function offer(overrides: Partial<JobOffer> = {}): JobOffer {
 
 const query: JobSearchQuery = {
   query: "React", location: "Paris", contract: "cdi", experience: "0-1",
-  sort: "recent", radius: 30, limit: 50,
+  radius: 30, limit: 50,
 };
 
 describe("offer quality filter", () => {
@@ -34,5 +34,15 @@ describe("offer quality filter", () => {
       offer({ id: "4", location: "Lyon", city: "Lyon" }),
     ], query);
     expect(result.map((item) => item.id)).toEqual(["1"]);
+  });
+
+  it("sorts by compatibility and uses recency to break equal scores", () => {
+    const result = filterAndSortOffers([
+      offer({ id: "description", title: "Ingénieur logiciel", publishedAt: "2026-09-22T10:00:00.000Z" }),
+      offer({ id: "older-title", publishedAt: "2026-09-20T10:00:00.000Z" }),
+      offer({ id: "newer-title", publishedAt: "2026-09-21T10:00:00.000Z" }),
+    ], query);
+    expect(result.map((item) => item.id)).toEqual(["newer-title", "older-title", "description"]);
+    expect(result[0]?.compatibilityScore).toBeGreaterThan(result[2]?.compatibilityScore ?? 0);
   });
 });
