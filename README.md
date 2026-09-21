@@ -8,6 +8,8 @@ Première étape d’un agrégateur d’offres inspiré du fonctionnement de Pis
 - filtres par métier, ville et contrat ;
 - endpoint local `GET /api/jobs/search` ;
 - connecteur serveur France Travail avec OAuth et géocodage des communes ;
+- connecteur Adzuna via l'API officielle ;
+- agrégation parallèle et déduplication inter-sources ;
 - persistance PostgreSQL optionnelle ;
 - schéma d’offre normalisé ;
 - classification enrichie par le titre ;
@@ -59,6 +61,8 @@ Vercel supplémentaire n'est nécessaire.
    - `FRANCE_TRAVAIL_CLIENT_ID` ;
    - `FRANCE_TRAVAIL_CLIENT_SECRET` ;
    - `FRANCE_TRAVAIL_SCOPE` avec `api_offresdemploiv2 o2dsoffre`.
+   - `ADZUNA_APP_ID` et `ADZUNA_APP_KEY` pour activer Adzuna ;
+   - `ADZUNA_COUNTRY` avec la valeur `fr`.
 4. Cliquer sur **Deploy**. Après une modification des variables, relancer un déploiement.
 
 La base de données n'est pas obligatoire au premier déploiement. Pour l'ajouter ensuite :
@@ -75,10 +79,21 @@ développement local. Il n'est pas utilisé par Vercel.
 ## Étapes suivantes
 
 1. Ajouter les identifiants France Travail dans `.env.local` ou dans Vercel.
-2. Ajouter PostgreSQL plus tard si l'historisation des offres devient nécessaire.
-3. Ajouter le connecteur Adzuna et la déduplication inter-sources.
-4. Ajouter les objectifs utilisateur et le scoring CV/offre.
+2. Créer des identifiants sur `developer.adzuna.com` et les ajouter dans Vercel.
+3. Ajouter PostgreSQL plus tard si l'historisation des offres devient nécessaire.
+4. Demander l'accès au flux/API d'affiliation Jobijoba avant son intégration.
+5. Ajouter les objectifs utilisateur et le scoring CV/offre.
 
-Sans configuration, l’application conserve automatiquement son mode démonstration. Avec
-les identifiants France Travail, la route de recherche interroge l’API réelle. Si PostgreSQL
-est également configuré, les résultats normalisés y sont enregistrés puis servent de repli.
+Avec les identifiants France Travail et/ou Adzuna, la route de recherche interroge les APIs
+configurées puis fusionne les doublons. Si PostgreSQL est également configuré, les résultats
+normalisés y sont enregistrés puis servent de repli. Aucune offre fictive n'est affichée.
+
+## Sources externes
+
+- **France Travail** : API officielle active.
+- **Adzuna** : API officielle intégrée, à activer avec un `app_id` et un `app_key`.
+- **Jobijoba** : la plateforme propose officiellement un flux, une API ou un widget via son
+  programme d'affiliation. L'intégration sera finalisée après obtention de leur format et de
+  leurs identifiants.
+- **HelloWork** : aucun scraper n'est inclus, leurs conditions interdisant l'extraction par
+  scraping. Une intégration nécessitera un accord ou un flux partenaire explicite.

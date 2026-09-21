@@ -1,4 +1,5 @@
 import "server-only";
+import { deduplicateOffers } from "../../jobs/deduplicate";
 import { normalizeOffer, toPublicOffer } from "../../jobs/normalize";
 import type { JobOffer, JobSearchQuery } from "../../jobs/types";
 import { getDatabase } from "../db/client";
@@ -104,5 +105,5 @@ export async function searchStoredOffers(query: JobSearchQuery): Promise<JobOffe
     LIMIT ${query.limit}
   `;
 
-  return rows.map(rowToOffer);
+  return deduplicateOffers(rows.map(rowToOffer));
 }

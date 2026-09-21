@@ -39,7 +39,8 @@ export type JobSearchQuery = {
 
 export type JobSearchResult = {
   offers: JobOffer[];
-  mode: "live" | "database" | "demo";
+  mode: "live" | "database" | "empty";
+  sources: string[];
   warnings: string[];
 };
 

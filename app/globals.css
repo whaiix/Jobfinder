@@ -215,6 +215,7 @@ h1 span { color: var(--green); }
 }
 .data-mode.live { color: #17583c; background: var(--mint); }
 .data-mode.database { color: #274b77; background: #e4eefb; }
+.data-mode.empty { color: #59635e; background: #e9ede8; }
 .search-warning {
   margin: -8px 0 18px;
   border: 1px solid #f2d1bd;
@@ -256,7 +257,16 @@ h1 span { color: var(--green); }
 .offer-title-row h3 { margin-bottom: 5px; font-size: 1.08rem; }
 .offer-title-row p, .offer-description { color: var(--muted); }
 .offer-title-row p { margin-bottom: 12px; font-size: 0.88rem; }
-.offer-description { max-width: 700px; margin-bottom: 15px; font-size: 0.9rem; line-height: 1.55; }
+.offer-description {
+  display: -webkit-box;
+  max-width: 700px;
+  margin-bottom: 15px;
+  overflow: hidden;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
 
 .contract-badge {
   flex: 0 0 auto;
@@ -298,6 +308,8 @@ h1 span { color: var(--green); }
 }
 
 .empty-state button { border: 0; color: var(--green); background: transparent; font-weight: 800; cursor: pointer; }
+.welcome-state { background: rgba(255, 255, 255, 0.45); }
+.welcome-state p { margin-bottom: 0; }
 
 @media (max-width: 760px) {
   .site-header { width: min(100% - 28px, 1180px); height: 68px; }

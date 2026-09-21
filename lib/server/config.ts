@@ -9,6 +9,12 @@ export type ServerConfig = {
     tokenUrl: string;
     apiBaseUrl: string;
   };
+  adzuna: {
+    appId: string | null;
+    appKey: string | null;
+    country: string;
+    apiBaseUrl: string;
+  };
 };
 
 export function getServerConfig(): ServerConfig {
@@ -25,9 +31,20 @@ export function getServerConfig(): ServerConfig {
         process.env.FRANCE_TRAVAIL_API_BASE_URL?.trim() ||
         "https://api.francetravail.io/partenaire/offresdemploi/v2",
     },
+    adzuna: {
+      appId: process.env.ADZUNA_APP_ID?.trim() || null,
+      appKey: process.env.ADZUNA_APP_KEY?.trim() || null,
+      country: process.env.ADZUNA_COUNTRY?.trim().toLowerCase() || "fr",
+      apiBaseUrl:
+        process.env.ADZUNA_API_BASE_URL?.trim() || "https://api.adzuna.com/v1/api",
+    },
   };
 }
 
 export function hasFranceTravailCredentials(config = getServerConfig()): boolean {
   return Boolean(config.franceTravail.clientId && config.franceTravail.clientSecret);
+}
+
+export function hasAdzunaCredentials(config = getServerConfig()): boolean {
+  return Boolean(config.adzuna.appId && config.adzuna.appKey);
 }

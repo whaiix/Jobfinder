@@ -8,7 +8,8 @@ type Props = {
 };
 
 type SearchMeta = {
-  mode: "live" | "database" | "demo";
+  mode: "live" | "database" | "empty";
+  sources: string[];
   warnings: string[];
 };
 
@@ -26,20 +27,26 @@ export function SearchExperience({ initialOffers }: Props) {
   const [contract, setContract] = useState<ContractFilter>("all");
   const [offers, setOffers] = useState(initialOffers);
   const [loading, setLoading] = useState(false);
-  const [searchMeta, setSearchMeta] = useState<SearchMeta>({ mode: "demo", warnings: [] });
+  const [hasSearched, setHasSearched] = useState(false);
+  const [searchMeta, setSearchMeta] = useState<SearchMeta>({
+    mode: "empty",
+    sources: [],
+    warnings: [],
+  });
 
   const categoryCounts = useMemo(
     () =>
-      initialOffers.reduce<Record<string, number>>((counts, offer) => {
+      offers.reduce<Record<string, number>>((counts, offer) => {
         counts[offer.contract] = (counts[offer.contract] ?? 0) + 1;
         return counts;
       }, {}),
-    [initialOffers],
+    [offers],
   );
 
   async function search(event?: FormEvent) {
     event?.preventDefault();
     setLoading(true);
+    setHasSearched(true);
     const params = new URLSearchParams({ q: query, location, contract });
 
     try {
@@ -50,9 +57,11 @@ export function SearchExperience({ initialOffers }: Props) {
       setSearchMeta(data.meta);
     } catch (error) {
       setSearchMeta({
-        mode: "demo",
+        mode: "empty",
+        sources: [],
         warnings: [error instanceof Error ? error.message : "Erreur de recherche."],
       });
+      setOffers([]);
     } finally {
       setLoading(false);
     }
@@ -60,6 +69,7 @@ export function SearchExperience({ initialOffers }: Props) {
 
   function chooseContract(value: ContractFilter) {
     setContract(value);
+    setHasSearched(true);
     queueMicrotask(() => {
       const params = new URLSearchParams({ q: query, location, contract: value });
       setLoading(true);
@@ -70,7 +80,11 @@ export function SearchExperience({ initialOffers }: Props) {
           setSearchMeta(data.meta);
         })
         .catch(() =>
-          setSearchMeta({ mode: "demo", warnings: ["La recherche n'a pas pu être effectuée."] }),
+          setSearchMeta({
+            mode: "empty",
+            sources: [],
+            warnings: ["La recherche n'a pas pu être effectuée."],
+          }),
         )
         .finally(() => setLoading(false));
     });
@@ -140,16 +154,22 @@ export function SearchExperience({ initialOffers }: Props) {
         <div className="section-heading">
           <div>
             <p className="eyebrow">Offres récentes</p>
-            <h2>{offers.length} opportunité{offers.length > 1 ? "s" : ""}</h2>
+            <h2>
+              {hasSearched
+                ? `${offers.length} opportunité${offers.length > 1 ? "s" : ""}`
+                : "Lance ta première recherche"}
+            </h2>
           </div>
           <div className="result-notes">
             <p className="quality-note"><span /> Classification enrichie par le titre</p>
             <p className={`data-mode ${searchMeta.mode}`}>
               {searchMeta.mode === "live"
-                ? "France Travail en direct"
+                ? `${searchMeta.sources.join(" + ")} en direct`
                 : searchMeta.mode === "database"
                   ? "Résultats enregistrés"
-                  : "Données de démonstration"}
+                  : hasSearched
+                    ? "Aucun résultat en direct"
+                    : "Sources officielles en direct"}
             </p>
           </div>
         </div>
@@ -183,11 +203,24 @@ export function SearchExperience({ initialOffers }: Props) {
                   )}
                 </div>
               </div>
-              <a className="offer-link" href={offer.applyUrl}>Voir l’offre <span>→</span></a>
+              <a
+                className="offer-link"
+                href={offer.applyUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                Voir l’offre <span>→</span>
+              </a>
             </article>
           ))}
 
-          {!loading && offers.length === 0 && (
+          {!loading && !hasSearched && (
+            <div className="empty-state welcome-state">
+              <p>Indique un métier et une ville pour interroger les offres disponibles.</p>
+            </div>
+          )}
+
+          {!loading && hasSearched && offers.length === 0 && (
             <div className="empty-state">
               <p>Aucune offre dans cette sélection.</p>
               <button type="button" onClick={() => chooseContract("all")}>Voir toutes les offres</button>
