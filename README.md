@@ -2,10 +2,17 @@
 
 Première étape d’un agrégateur d’offres inspiré du fonctionnement de Piston.
 
-## Ce qui est déjà présent
+## Fonctionnalités
 
-- interface de recherche responsive ;
-- filtres par métier, ville et contrat ;
+- landing page responsive blanche, bleu foncé et bleu électrique ;
+- page de recherche dédiée avec plusieurs métiers et plusieurs villes ;
+- filtres contrat ordonnés CDI, CDD, Alternance, Stage ;
+- filtre d'expérience de 0–1 an à 5 ans et plus ;
+- exclusion stricte des offres de plus de 14 jours ;
+- préférences enregistrées dans le navigateur ;
+- aperçu court et fiche complète de chaque annonce ;
+- extraction de mots-clés ATS et proposition de lettre adaptée ;
+- analyse locale du texte du CV et recommandations de métiers ;
 - endpoint local `GET /api/jobs/search` ;
 - connecteur serveur France Travail avec OAuth et géocodage des communes ;
 - connecteur Adzuna via l'API officielle ;
@@ -20,12 +27,21 @@ Première étape d’un agrégateur d’offres inspiré du fonctionnement de Pis
 La classification est volontairement déterministe et explicable :
 
 1. `stage`, `stagiaire`, `alternance`, `alternant`, `apprenti`, etc. dans le titre ;
-2. contrat fourni par la source ;
-3. autres indices présents dans le titre ;
-4. indices dans la description ;
+2. ces mêmes signaux forts dans la description, afin de corriger un tag source erroné ;
+3. contrat fourni par la source ;
+4. autres indices présents dans le titre puis la description ;
 5. catégorie `other` si aucun signal n’est suffisamment fiable.
 
-Un titre `Alternant développeur` fourni avec le tag `CDD` sera donc classé `alternance`.
+Un titre ou une description indiquant clairement `Alternance` avec un tag `CDD` sera donc classé
+`alternance`. L'expérience est également déduite des années explicites et de termes comme
+`débutant`, `junior`, `confirmé` ou `senior`.
+
+## Confidentialité du CV
+
+Le fichier PDF/TXT est envoyé uniquement à la fonction Vercel de l'application pour en extraire
+le texte, sans écriture en base ni stockage de fichier. Le texte extrait est ensuite conservé dans
+le `localStorage` du navigateur afin d'alimenter les recommandations et les lettres. L'utilisateur
+peut l'effacer depuis la page Profil.
 
 ## Lancer le projet
 
@@ -82,7 +98,7 @@ développement local. Il n'est pas utilisé par Vercel.
 2. Créer des identifiants sur `developer.adzuna.com` et les ajouter dans Vercel.
 3. Ajouter PostgreSQL plus tard si l'historisation des offres devient nécessaire.
 4. Demander l'accès au flux/API d'affiliation Jobijoba avant son intégration.
-5. Ajouter les objectifs utilisateur et le scoring CV/offre.
+5. Enrichir progressivement le catalogue de métiers et de compétences du moteur CV.
 
 Avec les identifiants France Travail et/ou Adzuna, la route de recherche interroge les APIs
 configurées puis fusionne les doublons. Si PostgreSQL est également configuré, les résultats

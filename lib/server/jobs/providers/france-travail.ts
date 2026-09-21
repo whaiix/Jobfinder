@@ -3,6 +3,7 @@ import {
   mapFranceTravailOffer,
   type FranceTravailApiOffer,
 } from "../../../jobs/providers/france-travail-mapper";
+import { splitSearchTerms } from "../../../jobs/filter-offers";
 import type { ContractFilter, JobOffer, JobSearchQuery } from "../../../jobs/types";
 import { getServerConfig } from "../../config";
 
@@ -70,12 +71,10 @@ async function resolveCommuneCode(location: string): Promise<string | null> {
   return communes[0]?.code ?? null;
 }
 
-function keywordVariants(query: string, contract: ContractFilter): string[] {
-  if (contract === "stage") return [`${query} stage`.trim(), `${query} stagiaire`.trim()];
-  if (contract === "alternance") {
-    return [`${query} alternance`.trim(), `${query} apprenti`.trim()];
-  }
-  return [query];
+function keywordForContract(query: string, contract: ContractFilter): string {
+  if (contract === "stage") return `${query} stage`.trim();
+  if (contract === "alternance") return `${query} alternance`.trim();
+  return query;
 }
 
 async function fetchVariant(
@@ -112,18 +111,24 @@ async function fetchVariant(
 }
 
 export async function searchFranceTravail(query: JobSearchQuery): Promise<JobOffer[]> {
-  const [token, communeCode] = await Promise.all([
+  const jobs = splitSearchTerms(query.query);
+  const locations = splitSearchTerms(query.location);
+  const effectiveJobs = jobs.length > 0 ? jobs : [""];
+  const effectiveLocations = locations.length > 0 ? locations : [""];
+  const [token, communeCodes] = await Promise.all([
     getAccessToken(),
-    resolveCommuneCode(query.location),
+    Promise.all(effectiveLocations.map(resolveCommuneCode)),
   ]);
   const batches = await Promise.all(
-    keywordVariants(query.query, query.contract).map((keyword) =>
-      fetchVariant(query, keyword, communeCode, token),
+    effectiveJobs.flatMap((job) =>
+      communeCodes.map((communeCode) =>
+        fetchVariant(query, keywordForContract(job, query.contract), communeCode, token),
+      ),
     ),
   );
   const deduplicated = new Map(batches.flat().map((offer) => [offer.id, offer]));
 
   return [...deduplicated.values()]
     .filter((offer) => query.contract === "all" || offer.contract === query.contract)
-    .slice(0, query.limit);
+    .slice(0, query.limit * 3);
 }

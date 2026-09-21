@@ -1,5 +1,6 @@
 import "server-only";
 import { deduplicateOffers } from "../../jobs/deduplicate";
+import { filterAndSortOffers } from "../../jobs/filter-offers";
 import { normalizeOffer, toPublicOffer } from "../../jobs/normalize";
 import type { JobOffer, JobSearchQuery } from "../../jobs/types";
 import { getDatabase } from "../db/client";
@@ -91,19 +92,15 @@ export async function upsertOffers(offers: JobOffer[]): Promise<void> {
 
 export async function searchStoredOffers(query: JobSearchQuery): Promise<JobOffer[]> {
   const sql = getDatabase();
-  const textPattern = `%${query.query}%`;
-  const locationPattern = `%${query.location}%`;
   const rows = await sql<JobRow[]>`
     SELECT *
     FROM job_offers
     WHERE
-      (${query.query} = '' OR title ILIKE ${textPattern} OR description ILIKE ${textPattern} OR company ILIKE ${textPattern})
-      AND (${query.location} = '' OR location ILIKE ${locationPattern} OR city ILIKE ${locationPattern} OR postal_code ILIKE ${locationPattern})
-      AND (${query.contract} = 'all' OR contract = ${query.contract})
+      published_at >= NOW() - INTERVAL '14 days'
       AND (expires_at IS NULL OR expires_at >= NOW())
     ORDER BY published_at DESC
-    LIMIT ${query.limit}
+    LIMIT 500
   `;
 
-  return deduplicateOffers(rows.map(rowToOffer));
+  return filterAndSortOffers(deduplicateOffers(rows.map(rowToOffer)), query).slice(0, query.limit);
 }

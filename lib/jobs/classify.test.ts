@@ -35,6 +35,16 @@ describe("classifyContract", () => {
     ).toEqual({ contract: "stage", reason: "description" });
   });
 
+  it("corrige un CDD source lorsque la description annonce une alternance", () => {
+    expect(
+      classifyContract({
+        title: "Développeur foncier H/F",
+        sourceContract: "CDD",
+        description: "Nous recherchons un développeur foncier en alternance.",
+      }),
+    ).toEqual({ contract: "alternance", reason: "description" });
+  });
+
   it("renvoie other lorsqu'aucun signal n'est fiable", () => {
     expect(
       classifyContract({

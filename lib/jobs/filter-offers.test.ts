@@ -1,0 +1,38 @@
+import { describe, expect, it } from "vitest";
+import { filterAndSortOffers, isFreshOffer } from "./filter-offers";
+import type { JobOffer, JobSearchQuery } from "./types";
+
+const now = Date.parse("2026-09-22T12:00:00.000Z");
+
+function offer(overrides: Partial<JobOffer> = {}): JobOffer {
+  return {
+    id: "1", source: "test", title: "Développeur React junior", company: "Acme",
+    location: "Paris", city: "Paris", description: "CDI, débutant accepté. React et TypeScript.",
+    publishedAt: "2026-09-20T12:00:00.000Z", applyUrl: "https://example.com",
+    contract: "cdi", contractLabel: "CDI", classificationReason: "description",
+    publishedLabel: "Il y a 2 jours", experienceLevel: "0-1", experienceLabel: "0–1 an",
+    experienceReason: "keyword", ...overrides,
+  };
+}
+
+const query: JobSearchQuery = {
+  query: "React", location: "Paris", contract: "cdi", experience: "0-1",
+  sort: "recent", radius: 30, limit: 50,
+};
+
+describe("offer quality filter", () => {
+  it("rejects offers older than fourteen days", () => {
+    expect(isFreshOffer(offer({ publishedAt: "2026-09-08T12:00:00.000Z" }), now)).toBe(true);
+    expect(isFreshOffer(offer({ publishedAt: "2026-09-08T11:59:59.000Z" }), now)).toBe(false);
+  });
+
+  it("keeps only matching contract, experience, job and location", () => {
+    const result = filterAndSortOffers([
+      offer(),
+      offer({ id: "2", contract: "cdd" }),
+      offer({ id: "3", experienceLevel: "3-5" }),
+      offer({ id: "4", location: "Lyon", city: "Lyon" }),
+    ], query);
+    expect(result.map((item) => item.id)).toEqual(["1"]);
+  });
+});

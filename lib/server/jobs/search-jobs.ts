@@ -1,5 +1,6 @@
 import "server-only";
 import { deduplicateOffers } from "../../jobs/deduplicate";
+import { filterAndSortOffers } from "../../jobs/filter-offers";
 import { toPublicOffer } from "../../jobs/normalize";
 import type { JobOffer, JobSearchQuery, JobSearchResult } from "../../jobs/types";
 import { hasAdzunaCredentials, hasFranceTravailCredentials } from "../config";
@@ -36,7 +37,10 @@ export async function searchJobs(query: JobSearchQuery): Promise<JobSearchResult
       }
     });
 
-    const uniqueOffers = deduplicateOffers(liveOffers).slice(0, query.limit);
+    const uniqueOffers = filterAndSortOffers(deduplicateOffers(liveOffers), query).slice(
+      0,
+      query.limit,
+    );
     if (uniqueOffers.length > 0) {
       if (isDatabaseConfigured()) {
         try {

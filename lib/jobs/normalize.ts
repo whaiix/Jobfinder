@@ -1,4 +1,5 @@
 import { classifyContract } from "./classify";
+import { inferExperience } from "./experience";
 import type { ContractType, JobOffer, RawJobOffer } from "./types";
 
 const contractLabels: Record<ContractType, string> = {
@@ -19,12 +20,16 @@ function formatPublishedDate(date: string): string {
 
 export function normalizeOffer(rawOffer: RawJobOffer): JobOffer {
   const classification = classifyContract(rawOffer);
+  const experience = inferExperience(rawOffer);
   return {
     ...rawOffer,
     contract: classification.contract,
     contractLabel: contractLabels[classification.contract],
     classificationReason: classification.reason,
     publishedLabel: formatPublishedDate(rawOffer.publishedAt),
+    experienceLevel: experience.level,
+    experienceLabel: experience.label,
+    experienceReason: experience.reason,
   };
 }
 

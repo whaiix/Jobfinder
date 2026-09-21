@@ -48,6 +48,11 @@ export function classifyContract(offer: Pick<RawJobOffer, "title" | "sourceContr
   const titleOverride = matchRules(offer.title, highConfidenceTitleRules);
   if (titleOverride) return { contract: titleOverride, reason: "title" };
 
+  // Les sources utilisent parfois CDD comme valeur générique. Un signal clair dans
+  // la description doit donc corriger ce tag pour les stages et alternances.
+  const descriptionOverride = matchRules(offer.description, highConfidenceTitleRules);
+  if (descriptionOverride) return { contract: descriptionOverride, reason: "description" };
+
   const sourceContract = matchRules(offer.sourceContract ?? "");
   if (sourceContract) return { contract: sourceContract, reason: "source" };
 
