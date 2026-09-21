@@ -164,7 +164,7 @@ export function SearchExperience({ initialOffers }: Props) {
             <p className="quality-note"><span /> Classification enrichie par le titre</p>
             <p className={`data-mode ${searchMeta.mode}`}>
               {searchMeta.mode === "live"
-                ? `${searchMeta.sources.join(" + ")} en direct`
+                ? `${searchMeta.sources?.join(" + ") || "Sources officielles"} en direct`
                 : searchMeta.mode === "database"
                   ? "Résultats enregistrés"
                   : hasSearched

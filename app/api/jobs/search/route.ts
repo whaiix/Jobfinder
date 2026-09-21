@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     meta: {
       ...parsed.data,
       mode: result.mode,
+      sources: result.sources,
       warnings: result.warnings,
     },
   });
