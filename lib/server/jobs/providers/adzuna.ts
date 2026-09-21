@@ -3,14 +3,14 @@ import {
   mapAdzunaOffer,
   type AdzunaApiOffer,
 } from "../../../jobs/providers/adzuna-mapper";
-import { splitSearchTerms } from "../../../jobs/filter-offers";
+import { expandJobSearchTerms, splitSearchTerms } from "../../../jobs/filter-offers";
 import type { JobOffer, JobSearchQuery } from "../../../jobs/types";
 import { getServerConfig } from "../../config";
 
 type SearchResponse = { results?: AdzunaApiOffer[] };
 
 function keywords(query: JobSearchQuery): string[] {
-  const jobs = splitSearchTerms(query.query);
+  const jobs = expandJobSearchTerms(query.query);
   const values = jobs.length > 0 ? jobs : [""];
   if (query.contract === "stage") return values.map((value) => `${value} stage`.trim());
   if (query.contract === "alternance") {

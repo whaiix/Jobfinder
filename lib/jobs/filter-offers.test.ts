@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterAndSortOffers, isFreshOffer } from "./filter-offers";
+import { expandJobSearchTerms, filterAndSortOffers, isFreshOffer } from "./filter-offers";
 import type { JobOffer, JobSearchQuery } from "./types";
 
 const now = Date.parse("2026-09-22T12:00:00.000Z");
@@ -21,6 +21,12 @@ const query: JobSearchQuery = {
 };
 
 describe("offer quality filter", () => {
+  it("expands composite recommended job titles", () => {
+    expect(expandJobSearchTerms("Webmaster & Chargé de Communication Digitale")).toEqual([
+      "Webmaster",
+      "Chargé de Communication Digitale",
+    ]);
+  });
   it("rejects offers older than fourteen days", () => {
     expect(isFreshOffer(offer({ publishedAt: "2026-09-08T12:00:00.000Z" }), now)).toBe(true);
     expect(isFreshOffer(offer({ publishedAt: "2026-09-08T11:59:59.000Z" }), now)).toBe(false);

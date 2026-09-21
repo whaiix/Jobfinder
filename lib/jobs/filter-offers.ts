@@ -7,6 +7,12 @@ export function splitSearchTerms(value: string): string[] {
   return [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))].slice(0, 3);
 }
 
+export function expandJobSearchTerms(value: string): string[] {
+  return [...new Set(splitSearchTerms(value).flatMap((item) =>
+    item.split(/\s+(?:&|et)\s+|\s*\/\s*/i).map((part) => part.trim()).filter(Boolean),
+  ))].slice(0, 6);
+}
+
 export function isFreshOffer(offer: Pick<JobOffer, "publishedAt">, now = Date.now()): boolean {
   const published = Date.parse(offer.publishedAt);
   return Number.isFinite(published) && published >= now - MAX_AGE_MS;
@@ -19,7 +25,7 @@ function includesAny(value: string, terms: string[]): boolean {
 }
 
 export function compatibilityScore(offer: JobOffer, query: JobSearchQuery): number {
-  const jobs = splitSearchTerms(query.query);
+  const jobs = expandJobSearchTerms(query.query);
   const locations = splitSearchTerms(query.location);
   const components: Array<{ score: number; weight: number }> = [];
 
@@ -48,7 +54,7 @@ export function compatibilityScore(offer: JobOffer, query: JobSearchQuery): numb
 }
 
 export function filterAndSortOffers(offers: JobOffer[], query: JobSearchQuery): JobOffer[] {
-  const jobs = splitSearchTerms(query.query);
+  const jobs = expandJobSearchTerms(query.query);
   const locations = splitSearchTerms(query.location);
   const filtered = offers.filter((offer) => {
     const matchesJob = includesAny(`${offer.title} ${offer.description} ${offer.company}`, jobs);

@@ -9,6 +9,9 @@ export type FranceTravailApiOffer = {
   dateActualisation?: string;
   typeContrat?: string;
   typeContratLibelle?: string;
+  experienceExige?: string;
+  experienceLibelle?: string;
+  experienceCommentaire?: string;
   dateFinPublication?: string;
   lieuTravail?: {
     libelle?: string;
@@ -36,6 +39,11 @@ export function mapFranceTravailOffer(source: FranceTravailApiOffer): JobOffer {
     latitude: place?.latitude ?? null,
     longitude: place?.longitude ?? null,
     description: source.description?.trim() || "Description non communiquée.",
+    experienceText: [
+      source.experienceExige === "D" ? "Débutant accepté" : "",
+      source.experienceLibelle,
+      source.experienceCommentaire,
+    ].filter(Boolean).join(" "),
     publishedAt: source.dateActualisation || source.dateCreation || new Date().toISOString(),
     expiresAt: source.dateFinPublication || null,
     applyUrl:

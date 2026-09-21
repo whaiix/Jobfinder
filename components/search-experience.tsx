@@ -162,7 +162,7 @@ export function SearchExperience({ initialOffers }: Props) {
 
         <div className="results-header">
           <div><p className="eyebrow">Résultats</p><h2>{hasSearched ? `${offers.length} offre${offers.length > 1 ? "s" : ""} compatible${offers.length > 1 ? "s" : ""}` : "Lancez votre recherche"}</h2></div>
-          <div className="result-notes"><span>14 jours maximum</span><span>{searchMeta.mode === "live" ? `${searchMeta.sources.join(" + ")} en direct` : searchMeta.mode === "database" ? "Résultats enregistrés" : "Sources officielles"}</span></div>
+          <div className="result-notes"><span>14 jours maximum</span><span>{searchMeta.mode === "live" ? `${searchMeta.sources.join(" + ")} en direct` : searchMeta.mode === "database" ? "Résultats enregistrés" : searchMeta.sources.length ? `${searchMeta.sources.join(" + ")} consultés` : "Sources officielles"}</span></div>
         </div>
         {searchMeta.warnings.length > 0 && <div className="search-warning" role="status">{searchMeta.warnings.join(" · ")}</div>}
 

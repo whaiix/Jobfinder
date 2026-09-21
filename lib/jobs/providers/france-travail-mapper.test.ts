@@ -25,4 +25,17 @@ describe("mapFranceTravailOffer", () => {
 
     expect(offer.contract).toBe("alternance");
   });
+
+  it("utilise le champ d'expérience structuré de France Travail", () => {
+    const offer = mapFranceTravailOffer({
+      id: "789",
+      intitule: "Webmaster",
+      description: "Gestion du site internet.",
+      experienceExige: "D",
+      experienceLibelle: "Débutant accepté",
+    });
+
+    expect(offer.experienceLevel).toBe("0-1");
+    expect(offer.experienceReason).toBe("keyword");
+  });
 });

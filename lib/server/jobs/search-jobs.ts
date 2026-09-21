@@ -11,6 +11,7 @@ import { searchStoredOffers, upsertOffers } from "./repository";
 
 export async function searchJobs(query: JobSearchQuery): Promise<JobSearchResult> {
   const warnings: string[] = [];
+  const attemptedSources: string[] = [];
   const providers: Array<{ name: string; search: () => Promise<JobOffer[]> }> = [];
 
   if (hasFranceTravailCredentials()) {
@@ -28,6 +29,7 @@ export async function searchJobs(query: JobSearchQuery): Promise<JobSearchResult
     settled.forEach((result, index) => {
       const provider = providers[index];
       if (result.status === "fulfilled") {
+        attemptedSources.push(provider.name);
         liveOffers.push(...result.value);
         sources.push(provider.name);
       } else {
@@ -76,7 +78,7 @@ export async function searchJobs(query: JobSearchQuery): Promise<JobSearchResult
   return {
     offers: [],
     mode: "empty",
-    sources: [],
+    sources: attemptedSources,
     warnings:
       providers.length === 0
         ? [...warnings, "Aucune source d’offres n’est configurée."]

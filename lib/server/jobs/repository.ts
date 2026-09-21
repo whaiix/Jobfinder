@@ -38,6 +38,10 @@ function rowToOffer(row: JobRow): JobOffer {
       latitude: row.latitude,
       longitude: row.longitude,
       description: row.description,
+      experienceText:
+        row.raw_offer && typeof row.raw_offer === "object" && "experienceLibelle" in row.raw_offer
+          ? String(row.raw_offer.experienceLibelle ?? "")
+          : null,
       publishedAt: row.published_at.toISOString(),
       expiresAt: row.expires_at?.toISOString() ?? null,
       applyUrl: row.apply_url,

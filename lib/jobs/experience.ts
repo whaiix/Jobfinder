@@ -35,9 +35,9 @@ function levelFromYears(years: number): ExperienceLevel {
 }
 
 export function inferExperience(
-  offer: Pick<RawJobOffer, "title" | "description">,
+  offer: Pick<RawJobOffer, "title" | "description" | "experienceText">,
 ): Experience {
-  const text = normalize(`${offer.title} ${offer.description}`);
+  const text = normalize(`${offer.title} ${offer.experienceText ?? ""} ${offer.description}`);
   const patterns = [
     /(?:minimum|min\.?|au moins|minimum de|experience de|experience professionnelle de|justifiez de)\s*(\d{1,2})\s*(?:ans?|annees?)/i,
     /(\d{1,2})\s*(?:a|à|-)\s*\d{1,2}\s*(?:ans?|annees?)(?:\s+d[' ]experience)?/i,

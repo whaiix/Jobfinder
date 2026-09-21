@@ -20,6 +20,7 @@ export type RawJobOffer = {
   latitude?: number | null;
   longitude?: number | null;
   description: string;
+  experienceText?: string | null;
   publishedAt: string;
   expiresAt?: string | null;
   applyUrl: string;

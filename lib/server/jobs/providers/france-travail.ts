@@ -3,7 +3,7 @@ import {
   mapFranceTravailOffer,
   type FranceTravailApiOffer,
 } from "../../../jobs/providers/france-travail-mapper";
-import { splitSearchTerms } from "../../../jobs/filter-offers";
+import { expandJobSearchTerms, splitSearchTerms } from "../../../jobs/filter-offers";
 import type { ContractFilter, JobOffer, JobSearchQuery } from "../../../jobs/types";
 import { getServerConfig } from "../../config";
 
@@ -111,7 +111,7 @@ async function fetchVariant(
 }
 
 export async function searchFranceTravail(query: JobSearchQuery): Promise<JobOffer[]> {
-  const jobs = splitSearchTerms(query.query);
+  const jobs = expandJobSearchTerms(query.query);
   const locations = splitSearchTerms(query.location);
   const effectiveJobs = jobs.length > 0 ? jobs : [""];
   const effectiveLocations = locations.length > 0 ? locations : [""];
