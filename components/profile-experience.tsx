@@ -15,7 +15,12 @@ export function ProfileExperience() {
   const analysis = useMemo(() => analyzeProfile(profile.cvText), [profile.cvText]);
 
   useEffect(() => {
-    setProfile(parseStoredProfile(localStorage.getItem(STORAGE_KEY)));
+    const saved = parseStoredProfile(localStorage.getItem(STORAGE_KEY));
+    const hydrated = saved.cvText && !saved.firstName && !saved.lastName && !saved.email && !saved.phone
+      ? { ...saved, ...inferContactDetails(saved.cvText), contactConfirmed: false }
+      : saved;
+    setProfile(hydrated);
+    if (hydrated.cvText) localStorage.setItem(STORAGE_KEY, JSON.stringify(hydrated));
   }, []);
 
   async function handleFile(event: ChangeEvent<HTMLInputElement>) {
