@@ -1,0 +1,34 @@
+import { classifyContract } from "./classify";
+import type { ContractType, JobOffer, RawJobOffer } from "./types";
+
+const contractLabels: Record<ContractType, string> = {
+  alternance: "Alternance",
+  stage: "Stage",
+  cdi: "CDI",
+  cdd: "CDD",
+  interim: "Intérim",
+  other: "Autre",
+};
+
+const relativeDateFormatter = new Intl.RelativeTimeFormat("fr", { numeric: "auto" });
+
+function formatPublishedDate(date: string): string {
+  const elapsedDays = Math.round((new Date(date).getTime() - Date.now()) / 86_400_000);
+  return relativeDateFormatter.format(elapsedDays, "day");
+}
+
+export function normalizeOffer(rawOffer: RawJobOffer): JobOffer {
+  const classification = classifyContract(rawOffer);
+  return {
+    ...rawOffer,
+    contract: classification.contract,
+    contractLabel: contractLabels[classification.contract],
+    classificationReason: classification.reason,
+    publishedLabel: formatPublishedDate(rawOffer.publishedAt),
+  };
+}
+
+export function toPublicOffer(offer: JobOffer): JobOffer {
+  const { raw: _raw, ...publicOffer } = offer;
+  return publicOffer;
+}
