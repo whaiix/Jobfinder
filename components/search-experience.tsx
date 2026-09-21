@@ -2,6 +2,7 @@
 
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { extractAtsKeywords, generateCoverLetter } from "@/lib/jobs/application-assistant";
+import { getSpontaneousTargets } from "@/lib/jobs/spontaneous";
 import type { ContractFilter, ExperienceFilter, JobOffer } from "@/lib/jobs/types";
 import { analyzeProfile } from "@/lib/profile/analyze-profile";
 
@@ -49,6 +50,7 @@ export function SearchExperience({ initialOffers }: Props) {
   const [jobDraft, setJobDraft] = useState("");
   const [cityDraft, setCityDraft] = useState("");
   const [recommendedJobs, setRecommendedJobs] = useState<string[]>([]);
+  const [activeView, setActiveView] = useState<"offers" | "spontaneous">("offers");
   const [contract, setContract] = useState<ContractFilter>("all");
   const [experience, setExperience] = useState<ExperienceFilter>("all");
   const [offers, setOffers] = useState(initialOffers);
@@ -83,6 +85,7 @@ export function SearchExperience({ initialOffers }: Props) {
   const categoryCounts = useMemo(() => offers.reduce<Record<string, number>>((counts, offer) => {
     counts[offer.contract] = (counts[offer.contract] ?? 0) + 1; return counts;
   }, {}), [offers]);
+  const spontaneousTargets = useMemo(() => getSpontaneousTargets(jobs), [jobs]);
 
   function addValue(draft: string, values: string[], setter: (value: string[]) => void, clear: () => void) {
     const value = draft.replace(/,$/, "").trim();
@@ -160,27 +163,39 @@ export function SearchExperience({ initialOffers }: Props) {
           <p className="memory-note">Vos critères sont mémorisés dans ce navigateur pour votre prochaine visite.</p>
         </form>
 
-        <div className="results-header">
-          <div><p className="eyebrow">Résultats</p><h2>{hasSearched ? `${offers.length} offre${offers.length > 1 ? "s" : ""} compatible${offers.length > 1 ? "s" : ""}` : "Lancez votre recherche"}</h2></div>
-          <div className="result-notes"><span>14 jours maximum</span><span>{searchMeta.mode === "live" ? `${searchMeta.sources.join(" + ")} en direct` : searchMeta.mode === "database" ? "Résultats enregistrés" : searchMeta.sources.length ? `${searchMeta.sources.join(" + ")} consultés` : "Sources officielles"}</span></div>
+        <div className="search-mode-tabs" role="tablist" aria-label="Type de recherche">
+          <button type="button" role="tab" aria-selected={activeView === "offers"} className={activeView === "offers" ? "active" : ""} onClick={() => setActiveView("offers")}>Offres d’emploi</button>
+          <button type="button" role="tab" aria-selected={activeView === "spontaneous"} className={activeView === "spontaneous" ? "active" : ""} onClick={() => setActiveView("spontaneous")}>Candidature spontanée</button>
         </div>
-        {searchMeta.warnings.length > 0 && <div className="search-warning" role="status">{searchMeta.warnings.join(" · ")}</div>}
 
-        <div className="offer-list">
-          {offers.map((offer) => (
-            <button className="offer-card" type="button" key={offer.id} onClick={() => openOffer(offer)}>
-              <div className="company-logo" aria-hidden="true">{offer.company.slice(0, 1).toUpperCase()}</div>
-              <div className="offer-main">
-                <div className="offer-title-row"><div><h3>{offer.title}</h3><p>{offer.company} · {offer.location}</p></div><span className={`contract-badge ${offer.contract}`}>{offer.contractLabel}</span></div>
-                <p className="offer-description">{offer.description}</p>
-                <div className="offer-meta"><span className="compatibility-label">{offer.compatibilityScore ?? 100}% compatible</span><span>{offer.publishedLabel}</span><span>{offer.experienceLabel}</span><span>{offer.source}</span>{offer.classificationReason !== "source" && <span className="corrected-label">Contrat vérifié dans l’annonce</span>}</div>
-              </div>
-              <span className="open-offer">Ouvrir <b>→</b></span>
-            </button>
-          ))}
-          {!loading && !hasSearched && <div className="empty-state"><span>⌕</span><h3>À vous de jouer</h3><p>Ajoutez jusqu’à trois métiers et trois villes, puis lancez la recherche.</p></div>}
-          {!loading && hasSearched && offers.length === 0 && <div className="empty-state"><span>⌕</span><h3>Aucune offre correspondante</h3><p>Essayez d’élargir l’expérience ou le type de contrat.</p></div>}
-        </div>
+        {activeView === "offers" ? <>
+          <div className="results-header">
+            <div><p className="eyebrow">Résultats</p><h2>{hasSearched ? `${offers.length} offre${offers.length > 1 ? "s" : ""} compatible${offers.length > 1 ? "s" : ""}` : "Lancez votre recherche"}</h2></div>
+            <div className="result-notes"><span>14 jours maximum</span><span>{searchMeta.mode === "live" ? `${searchMeta.sources.join(" + ")} en direct` : searchMeta.mode === "database" ? "Résultats enregistrés" : searchMeta.sources.length ? `${searchMeta.sources.join(" + ")} consultés` : "Sources officielles"}</span></div>
+          </div>
+          {searchMeta.warnings.length > 0 && <div className="search-warning" role="status">{searchMeta.warnings.join(" · ")}</div>}
+
+          <div className="offer-list">
+            {offers.map((offer) => (
+              <button className="offer-card" type="button" key={offer.id} onClick={() => openOffer(offer)}>
+                {offer.experienceLevel === "unknown" && <span className="experience-warning">Expérience non indiquée par le recruteur</span>}
+                <div className="company-logo" aria-hidden="true">{offer.company.slice(0, 1).toUpperCase()}</div>
+                <div className="offer-main">
+                  <div className="offer-title-row"><div><h3>{offer.title}</h3><p>{offer.company} · {offer.location}</p></div><span className={`contract-badge ${offer.contract}`}>{offer.contractLabel}</span></div>
+                  <p className="offer-description">{offer.description}</p>
+                  <div className="offer-meta"><span className="compatibility-label">{offer.compatibilityScore ?? 100}% compatible</span><span>{offer.publishedLabel}</span><span>{offer.experienceLabel}</span><span>{offer.source}</span>{offer.classificationReason !== "source" && <span className="corrected-label">Contrat vérifié dans l’annonce</span>}</div>
+                </div>
+                <span className="open-offer">Ouvrir <b>→</b></span>
+              </button>
+            ))}
+            {!loading && !hasSearched && <div className="empty-state"><span>⌕</span><h3>À vous de jouer</h3><p>Ajoutez jusqu’à trois métiers et trois villes, puis lancez la recherche.</p></div>}
+            {!loading && hasSearched && offers.length === 0 && <div className="empty-state"><span>⌕</span><h3>Aucune offre correspondante</h3><p>Essayez d’élargir le métier ou le type de contrat.</p></div>}
+          </div>
+        </> : <section className="spontaneous-section">
+          <div className="results-header"><div><p className="eyebrow">Démarche proactive</p><h2>Entreprises à contacter directement</h2></div><div className="result-notes"><span>Liens officiels vérifiés</span></div></div>
+          <p className="spontaneous-intro">Ces entreprises correspondent aux métiers sélectionnés. Consultez leur page officielle avant d’adapter votre candidature à leurs activités.</p>
+          {spontaneousTargets.length > 0 ? <div className="spontaneous-grid">{spontaneousTargets.map((target) => <article key={target.name}><div className="company-logo">{target.name.slice(0, 1)}</div><div><h3>{target.name}</h3><span>{target.location}</span><p>{target.description}</p></div><a href={target.contactUrl} target="_blank" rel="noreferrer noopener">Page contact ↗</a></article>)}</div> : <div className="empty-state"><span>✦</span><h3>Sélectionnez un métier</h3><p>Les contacts pertinents apparaîtront ici, notamment pour la communication, le marketing et le digital.</p></div>}
+        </section>}
       </section>
 
       {selectedOffer && (

@@ -16,6 +16,7 @@ Première étape d’un agrégateur d’offres inspiré du fonctionnement de Pis
 - endpoint local `GET /api/jobs/search` ;
 - connecteur serveur France Travail avec OAuth et géocodage des communes ;
 - connecteur Adzuna via l'API officielle ;
+- recherche web optionnelle sur les cinq premières pages Google via l’API Serper ;
 - agrégation parallèle et déduplication inter-sources ;
 - persistance PostgreSQL optionnelle ;
 - schéma d’offre normalisé ;
@@ -79,6 +80,7 @@ Vercel supplémentaire n'est nécessaire.
    - `FRANCE_TRAVAIL_SCOPE` avec `api_offresdemploiv2 o2dsoffre`.
    - `ADZUNA_APP_ID` et `ADZUNA_APP_KEY` pour activer Adzuna ;
    - `ADZUNA_COUNTRY` avec la valeur `fr`.
+   - `SERPER_API_KEY` pour analyser jusqu’à 50 résultats Google récents via Serper.
 4. Cliquer sur **Deploy**. Après une modification des variables, relancer un déploiement.
 
 La base de données n'est pas obligatoire au premier déploiement. Pour l'ajouter ensuite :
@@ -113,3 +115,6 @@ normalisés y sont enregistrés puis servent de repli. Aucune offre fictive n'es
   leurs identifiants.
 - **HelloWork** : aucun scraper n'est inclus, leurs conditions interdisant l'extraction par
   scraping. Une intégration nécessitera un accord ou un flux partenaire explicite.
+- **Google** : Google ne fournit plus sa Custom Search JSON API aux nouveaux clients. Le connecteur
+  web utilise donc l’API Serper lorsqu’une clé `SERPER_API_KEY` est configurée. Cinq pages sont
+  interrogées et seuls les résultats dont la date est vérifiable et inférieure à 14 jours sont gardés.

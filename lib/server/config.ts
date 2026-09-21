@@ -15,6 +15,7 @@ export type ServerConfig = {
     country: string;
     apiBaseUrl: string;
   };
+  serper: { apiKey: string | null; apiBaseUrl: string };
 };
 
 export function getServerConfig(): ServerConfig {
@@ -38,6 +39,10 @@ export function getServerConfig(): ServerConfig {
       apiBaseUrl:
         process.env.ADZUNA_API_BASE_URL?.trim() || "https://api.adzuna.com/v1/api",
     },
+    serper: {
+      apiKey: process.env.SERPER_API_KEY?.trim() || null,
+      apiBaseUrl: process.env.SERPER_API_BASE_URL?.trim() || "https://google.serper.dev/search",
+    },
   };
 }
 
@@ -47,4 +52,8 @@ export function hasFranceTravailCredentials(config = getServerConfig()): boolean
 
 export function hasAdzunaCredentials(config = getServerConfig()): boolean {
   return Boolean(config.adzuna.appId && config.adzuna.appKey);
+}
+
+export function hasSerperCredentials(config = getServerConfig()): boolean {
+  return Boolean(config.serper.apiKey);
 }

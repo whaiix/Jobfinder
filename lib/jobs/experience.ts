@@ -66,5 +66,5 @@ export function inferExperience(
 }
 
 export function matchesExperience(level: ExperienceLevel, filter: ExperienceFilter): boolean {
-  return filter === "all" || level === filter;
+  return filter === "all" || level === "unknown" || level === filter;
 }

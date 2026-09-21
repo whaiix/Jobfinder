@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inferExperience } from "./experience";
+import { inferExperience, matchesExperience } from "./experience";
 
 describe("inferExperience", () => {
   it.each([
@@ -10,5 +10,10 @@ describe("inferExperience", () => {
     ["Profil senior autonome", "5+"],
   ])("classe %s", (description, expected) => {
     expect(inferExperience({ title: "Développeur", description }).level).toBe(expected);
+  });
+
+  it("propose une expérience non précisée dans tous les filtres", () => {
+    expect(matchesExperience("unknown", "0-1")).toBe(true);
+    expect(matchesExperience("unknown", "5+")).toBe(true);
   });
 });

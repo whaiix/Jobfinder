@@ -3,10 +3,11 @@ import { deduplicateOffers } from "../../jobs/deduplicate";
 import { filterAndSortOffers } from "../../jobs/filter-offers";
 import { toPublicOffer } from "../../jobs/normalize";
 import type { JobOffer, JobSearchQuery, JobSearchResult } from "../../jobs/types";
-import { hasAdzunaCredentials, hasFranceTravailCredentials } from "../config";
+import { hasAdzunaCredentials, hasFranceTravailCredentials, hasSerperCredentials } from "../config";
 import { isDatabaseConfigured } from "../db/client";
 import { searchAdzuna } from "./providers/adzuna";
 import { searchFranceTravail } from "./providers/france-travail";
+import { searchWeb } from "./providers/web-search";
 import { searchStoredOffers, upsertOffers } from "./repository";
 
 export async function searchJobs(query: JobSearchQuery): Promise<JobSearchResult> {
@@ -19,6 +20,9 @@ export async function searchJobs(query: JobSearchQuery): Promise<JobSearchResult
   }
   if (hasAdzunaCredentials()) {
     providers.push({ name: "Adzuna", search: () => searchAdzuna(query) });
+  }
+  if (hasSerperCredentials()) {
+    providers.push({ name: "Web (5 pages Google)", search: () => searchWeb(query) });
   }
 
   if (providers.length > 0) {

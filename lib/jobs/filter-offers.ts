@@ -47,7 +47,10 @@ export function compatibilityScore(offer: JobOffer, query: JobSearchQuery): numb
     weight: 20,
   });
   if (query.contract !== "all") components.push({ score: offer.contract === query.contract ? 100 : 0, weight: 15 });
-  if (query.experience !== "all") components.push({ score: matchesExperience(offer.experienceLevel, query.experience) ? 100 : 0, weight: 15 });
+  if (query.experience !== "all") components.push({
+    score: offer.experienceLevel === "unknown" ? 65 : offer.experienceLevel === query.experience ? 100 : 0,
+    weight: 15,
+  });
   if (components.length === 0) return 100;
   const totalWeight = components.reduce((sum, component) => sum + component.weight, 0);
   return Math.round(components.reduce((sum, component) => sum + component.score * component.weight, 0) / totalWeight);
