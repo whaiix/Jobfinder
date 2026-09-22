@@ -38,4 +38,9 @@ describe("mapFranceTravailOffer", () => {
     expect(offer.experienceLevel).toBe("0-1");
     expect(offer.experienceReason).toBe("keyword");
   });
+
+  it("affiche France Travail plutôt qu'un code d'origine numérique", () => {
+    const offer = mapFranceTravailOffer({ id: "source", intitule: "Webmaster", origineOffre: { origine: "2" } });
+    expect(offer.source).toBe("France Travail");
+  });
 });

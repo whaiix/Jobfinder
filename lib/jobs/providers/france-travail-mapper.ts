@@ -27,9 +27,10 @@ export type FranceTravailApiOffer = {
 
 export function mapFranceTravailOffer(source: FranceTravailApiOffer): JobOffer {
   const place = source.lieuTravail;
+  const origin = source.origineOffre?.origine?.trim();
   const rawOffer: RawJobOffer = {
     id: `france-travail:${source.id}`,
-    source: source.origineOffre?.origine || "France Travail",
+    source: origin && !/^\d+$/.test(origin) ? origin : "France Travail",
     sourceContract: [source.typeContrat, source.typeContratLibelle].filter(Boolean).join(" "),
     title: source.intitule?.trim() || "Offre sans intitulé",
     company: source.entreprise?.nom?.trim() || "Entreprise non communiquée",

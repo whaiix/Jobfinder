@@ -57,24 +57,25 @@ export function generateCoverLetters(offer: JobOffer, profile: ProfileData) {
   const signature = name ? `Cordialement,\n${name}` : "Cordialement";
   const skills = strengths.length ? strengths.join(", ") : "l’autonomie, la rigueur et le travail en équipe";
   const specificDetail = highlights.numeric || highlights.mission;
+  const company = /^Employeur à vérifier$/i.test(offer.company) ? "l’entreprise qui recrute" : offer.company;
 
   const direct = `Objet : Candidature – ${offer.title}
 
 Madame, Monsieur,
 
-Je souhaite rejoindre ${offer.company} au poste de ${offer.title}. Mon expérience de ${skills} répond directement aux compétences mises en avant dans votre annonce.
+Je souhaite rejoindre ${company} au poste de ${offer.title}. Mon expérience de ${skills} répond directement aux compétences mises en avant dans votre annonce.
 
 ${specificDetail ? `J’ai notamment relevé cet enjeu : « ${specificDetail} » Cette priorité fait écho à ma façon de travailler : partir d’un objectif concret, mesurer l’avancement et livrer un résultat directement exploitable par l’équipe.` : `Les missions décrites demandent une combinaison de maîtrise opérationnelle, d’autonomie et de collaboration que j’ai développée au fil de mon parcours.`}
 
-Je pourrais ainsi contribuer rapidement à vos projets, tout en m’adaptant aux méthodes et aux objectifs propres à ${offer.company}. Je serais heureux d’échanger avec vous sur des exemples précis de réalisations en lien avec vos besoins.
+Je pourrais ainsi contribuer rapidement à vos projets, tout en m’adaptant aux méthodes et aux objectifs propres à ${company}. Je serais heureux d’échanger avec vous sur des exemples précis de réalisations en lien avec vos besoins.
 
 ${signature}`;
 
-  const narrative = `Objet : Envie de contribuer aux projets de ${offer.company}
+  const narrative = `Objet : Envie de contribuer aux projets de ${company}
 
 Madame, Monsieur,
 
-Ce qui m’attire dans votre offre de ${offer.title}, c’est la possibilité de mettre mes compétences au service d’une entreprise et d’une équipe identifiées, plutôt que de candidater à un intitulé générique. La manière dont ${offer.company} présente ce poste laisse apparaître un besoin concret auquel je souhaite contribuer.
+Ce qui m’attire dans votre offre de ${offer.title}, c’est la possibilité de mettre mes compétences au service d’une entreprise et d’une équipe identifiées, plutôt que de candidater à un intitulé générique. La manière dont ${company} présente ce poste laisse apparaître un besoin concret auquel je souhaite contribuer.
 
 Mon parcours m’a permis de construire une base solide autour de ${skills}. ${highlights.mission ? `Votre annonce insiste notamment sur le point suivant : « ${highlights.mission} » C’est précisément le type de responsabilité dans lequel je peux mobiliser mes acquis tout en continuant à progresser.` : `Ces compétences me permettraient d’aborder vos missions avec méthode, curiosité et sens du collectif.`}
 

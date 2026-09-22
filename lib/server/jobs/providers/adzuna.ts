@@ -19,7 +19,7 @@ function keywords(query: JobSearchQuery, contract?: ContractType): string[] {
   return values;
 }
 
-async function fetchAdzunaLocation(query: JobSearchQuery, location: string, contract?: ContractType): Promise<JobOffer[]> {
+async function fetchAdzunaLocation(query: JobSearchQuery, location: string, keyword: string, contract?: ContractType): Promise<JobOffer[]> {
   const { adzuna } = getServerConfig();
   if (!adzuna.appId || !adzuna.appKey) throw new Error("Identifiants Adzuna absents.");
 
@@ -29,9 +29,7 @@ async function fetchAdzunaLocation(query: JobSearchQuery, location: string, cont
   url.searchParams.set("app_key", adzuna.appKey);
   url.searchParams.set("results_per_page", String(Math.min(query.limit * 2, 50)));
   url.searchParams.set("content-type", "application/json");
-  const searchKeywords = keywords(query, contract).filter(Boolean);
-  if (searchKeywords.length === 1) url.searchParams.set("what", searchKeywords[0]);
-  if (searchKeywords.length > 1) url.searchParams.set("what_or", searchKeywords.join(" "));
+  if (keyword) url.searchParams.set("what", keyword);
   if (location) url.searchParams.set("where", location);
   if (contract === "cdi") url.searchParams.set("permanent", "1");
 
@@ -56,10 +54,21 @@ export async function searchAdzuna(query: JobSearchQuery): Promise<JobOffer[]> {
   const contractVariants: Array<ContractType | undefined> = query.contracts.length > 0
     ? query.contracts
     : [undefined];
-  const batches = await Promise.all(
-    (locations.length > 0 ? locations : [""]).flatMap((location) =>
-      contractVariants.map((contract) => fetchAdzunaLocation(query, location, contract)),
+  const tasks = (locations.length > 0 ? locations : [""]).flatMap((location) =>
+    contractVariants.flatMap((contract) =>
+      keywords(query, contract).map((keyword) => () => fetchAdzunaLocation(query, location, keyword, contract)),
     ),
   );
+  const settled: PromiseSettledResult<JobOffer[]>[] = [];
+  for (let index = 0; index < tasks.length; index += 4) {
+    settled.push(...await Promise.allSettled(tasks.slice(index, index + 4).map((task) => task())));
+  }
+  const batches = settled
+    .filter((result): result is PromiseFulfilledResult<JobOffer[]> => result.status === "fulfilled")
+    .map((result) => result.value);
+  if (batches.length === 0) {
+    const failure = settled.find((result): result is PromiseRejectedResult => result.status === "rejected");
+    throw failure?.reason ?? new Error("Adzuna n’a renvoyé aucun résultat exploitable.");
+  }
   return [...new Map(batches.flat().map((offer) => [offer.id, offer])).values()];
 }

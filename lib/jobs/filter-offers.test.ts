@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expandJobSearchTerms, filterAndSortOffers, isFreshOffer } from "./filter-offers";
+import { expandJobSearchTerms, filterAndSortOffers, groupJobSearchTerms, isFreshOffer } from "./filter-offers";
 import type { JobOffer, JobSearchQuery } from "./types";
 
 const now = Date.parse("2026-09-22T12:00:00.000Z");
@@ -26,6 +26,13 @@ describe("offer quality filter", () => {
     expect(terms).toContain("Webmaster");
     expect(terms).toContain("Chargé de communication");
     expect(terms).toContain("Assistant de communication");
+  });
+  it("keeps several selected jobs in separate search groups", () => {
+    const groups = groupJobSearchTerms("Webmaster,Chargé de communication");
+    expect(groups).toHaveLength(2);
+    expect(groups[0]).toContain("Webmaster");
+    expect(groups[0]).not.toContain("Assistant de communication");
+    expect(groups[1]).toContain("Assistant de communication");
   });
   it("rejects offers older than thirty days", () => {
     expect(isFreshOffer(offer({ publishedAt: "2026-08-23T12:00:00.000Z" }), now)).toBe(true);

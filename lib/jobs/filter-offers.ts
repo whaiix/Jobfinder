@@ -8,17 +8,23 @@ export function splitSearchTerms(value: string): string[] {
 }
 
 export function expandJobSearchTerms(value: string): string[] {
+  return [...new Set(groupJobSearchTerms(value).flat())].slice(0, 10);
+}
+
+export function groupJobSearchTerms(value: string): string[][] {
   const baseTerms = splitSearchTerms(value).flatMap((item) =>
     item.split(/\s+(?:&|et)\s+|\s*\/\s*/i).map((part) => part.trim()).filter(Boolean),
   );
-  const aliases = baseTerms.flatMap((term) => {
+  return baseTerms.slice(0, 6).map((term) => {
     const normalized = term.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-    if (normalized.includes("webmaster") || normalized.includes("communication digitale") || normalized.includes("charge de communication") || normalized.includes("assistant de communication")) {
-      return [term, "Webmaster", "Chargé de communication", "Assistant de communication", "Communication digitale", "Community manager"];
+    if (normalized.includes("webmaster") || normalized.includes("webmestre")) {
+      return [...new Set([term, "Webmaster", "Webmestre"])];
+    }
+    if (normalized.includes("communication digitale") || normalized.includes("charge de communication") || normalized.includes("assistant de communication")) {
+      return [...new Set([term, "Chargé de communication", "Assistant de communication", "Communication digitale", "Community manager"] )];
     }
     return [term];
   });
-  return [...new Set(aliases)].slice(0, 8);
 }
 
 export function isFreshOffer(offer: Pick<JobOffer, "publishedAt">, now = Date.now()): boolean {

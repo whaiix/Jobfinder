@@ -1,13 +1,12 @@
 import "server-only";
-import { expandJobSearchTerms, splitSearchTerms } from "../../../jobs/filter-offers";
+import { groupJobSearchTerms, splitSearchTerms } from "../../../jobs/filter-offers";
 import { mapWebSearchResult, type WebSearchResult } from "../../../jobs/providers/web-search-mapper";
 import type { ContractType, JobOffer, JobSearchQuery } from "../../../jobs/types";
 import { getServerConfig } from "../../config";
 
 type SerperResponse = { organic?: WebSearchResult[] };
 
-function buildQuery(query: JobSearchQuery, contract?: ContractType) {
-  const jobs = expandJobSearchTerms(query.query);
+function buildQuery(query: JobSearchQuery, jobs: string[], contract?: ContractType) {
   const locations = splitSearchTerms(query.location);
   const jobPart = jobs.length ? `(${jobs.map((job) => `"${job}"`).join(" OR ")})` : "emploi";
   const locationPart = locations.length ? `(${locations.map((location) => `"${location}"`).join(" OR ")})` : "France";
@@ -30,13 +29,18 @@ async function fetchPage(search: string, page: number): Promise<WebSearchResult[
 }
 
 export async function searchWeb(query: JobSearchQuery): Promise<JobOffer[]> {
+  const jobGroups = groupJobSearchTerms(query.query);
+  const effectiveGroups = jobGroups.length ? jobGroups : [["emploi"]];
+  const pagesPerGroup = Math.max(1, Math.ceil(5 / effectiveGroups.length));
   const contractVariants: Array<ContractType | undefined> = query.contracts.length
     ? query.contracts
     : [undefined];
-  const pages = await Promise.all(contractVariants.flatMap((contract) => {
-    const search = buildQuery(query, contract);
-    return [1, 2, 3, 4, 5].map((page) => fetchPage(search, page));
-  }));
+  const pages = await Promise.all(contractVariants.flatMap((contract) =>
+    effectiveGroups.flatMap((jobs) => {
+      const search = buildQuery(query, jobs, contract);
+      return Array.from({ length: pagesPerGroup }, (_, index) => fetchPage(search, index + 1));
+    }),
+  ));
   const offers = pages.flat().map(mapWebSearchResult).filter((offer): offer is JobOffer => offer !== null).map((offer) => ({
     ...offer,
     location: query.location || offer.location,

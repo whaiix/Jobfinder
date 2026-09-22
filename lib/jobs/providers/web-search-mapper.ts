@@ -10,6 +10,34 @@ export type WebSearchResult = {
   position?: number;
 };
 
+const aggregatorHosts = [
+  "hellowork.com", "jobijoba.com", "adzuna.fr", "indeed.com", "apec.fr",
+  "cadremploi.fr", "meteojob.com", "profilculture.com", "lyon-emplois.com",
+  "francetravail.fr", "welcometothejungle.com", "glassdoor.fr", "talent.com",
+];
+
+function cleanCompany(value: string) {
+  return value.replace(/\s+/g, " ").replace(/\s+(?:recrute|recherche)$/i, "").trim();
+}
+
+function extractCompany(source: WebSearchResult, hostname: string) {
+  const snippet = source.snippet?.trim() ?? "";
+  const repeatedEmployer = snippet.match(/\b(?:pour|chez)\s+([^.!?]{2,80}?)\.\s+\1\s+recrute\b/i)?.[1];
+  const namedEmployer = snippet.match(/\b(?:pour|chez)\s+([A-ZÀ-ÖØ-Þ][\p{L}\p{N}&'’+.-]*(?:\s+[A-ZÀ-ÖØ-Þ\d][\p{L}\p{N}&'’+.-]*){0,6})(?=[.,]|\s+recrute\b|$)/u)?.[1];
+  const candidate = cleanCompany(repeatedEmployer || namedEmployer || "");
+  if (candidate && !/^(?:un|une|le|la|les|notre|son)\b|client|compte/i.test(candidate)) return candidate;
+
+  if (hostname.endsWith("profilculture.com")) {
+    const commaEmployer = source.title?.split(",")[1]?.trim();
+    if (commaEmployer && commaEmployer.length <= 80) return commaEmployer;
+  }
+
+  const isAggregator = aggregatorHosts.some((host) => hostname === host || hostname.endsWith(`.${host}`));
+  if (isAggregator) return "Employeur à vérifier";
+  const domain = hostname.split(".")[0] ?? hostname;
+  return domain.split("-").filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+}
+
 export function parseWebDate(value?: string, now = new Date()): string | null {
   if (!value) return null;
   const normalized = value.toLowerCase().trim();
@@ -27,8 +55,9 @@ export function parseWebDate(value?: string, now = new Date()): string | null {
 export function mapWebSearchResult(source: WebSearchResult): JobOffer | null {
   const publishedAt = parseWebDate(source.date);
   if (!source.link || !publishedAt) return null;
-  let company = source.source || "Site employeur";
-  try { company = new URL(source.link).hostname.replace(/^www\./, ""); } catch { /* URL déjà validée par le fournisseur. */ }
+  let hostname = "site-employeur.fr";
+  try { hostname = new URL(source.link).hostname.replace(/^www\./, "").toLowerCase(); } catch { /* URL déjà validée par le fournisseur. */ }
+  const company = extractCompany(source, hostname);
   const rawOffer: RawJobOffer = {
     id: `web:${source.link}`,
     source: "Recherche Google",
