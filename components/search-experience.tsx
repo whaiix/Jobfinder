@@ -151,7 +151,7 @@ export function SearchExperience({ initialOffers }: Props) {
     }
   }
 
-  async function runSearch(selection: { jobs: string[]; cities: string[]; contracts: ContractType[]; experience: ExperienceFilter }) {
+  async function runSearch(selection: { jobs: string[]; cities: string[]; contracts: ContractType[]; experience: ExperienceFilter }, preservedOffers: JobOffer[] = []) {
     const requestId = ++searchRequestRef.current;
     const { jobs: nextJobs, cities: nextCities, contracts: nextContracts, experience: nextExperience } = selection;
     setJobs(nextJobs); setCities(nextCities); setJobDraft(""); setCityDraft("");
@@ -165,7 +165,9 @@ export function SearchExperience({ initialOffers }: Props) {
       if (!response.ok) throw new Error("La recherche n’a pas pu être effectuée.");
       if (requestId !== searchRequestRef.current) return;
       const appliedIds = new Set(parseTrackedOffers(localStorage.getItem(TRACKING_KEY)).filter((item) => item.status === "applied").map((item) => item.offer.id));
-      const scored = data.offers.filter((offer) => !appliedIds.has(offer.id)).map((offer) => ({ ...offer, compatibilityScore: calculateCvCompatibility(offer, profileData.cvText) }))
+      const merged = [...new Map([...preservedOffers, ...data.offers].map((offer) => [offer.id, offer])).values()]
+        .filter((offer) => nextContracts.length === 0 || nextContracts.includes(offer.contract));
+      const scored = merged.filter((offer) => !appliedIds.has(offer.id)).map((offer) => ({ ...offer, compatibilityScore: calculateCvCompatibility(offer, profileData.cvText) }))
         .sort((left, right) => (right.compatibilityScore ?? 0) - (left.compatibilityScore ?? 0) || Date.parse(right.publishedAt) - Date.parse(left.publishedAt));
       setOffers(scored); setSearchMeta(data.meta);
     } catch (error) {
@@ -183,8 +185,9 @@ export function SearchExperience({ initialOffers }: Props) {
 
   function toggleContract(value: ContractType | "all") {
     const nextContracts = value === "all" ? [] : contracts.includes(value) ? contracts.filter((item) => item !== value) : [...contracts, value];
+    const expandsSelection = value === "all" || contracts.every((contract) => nextContracts.includes(contract));
     setContracts(nextContracts);
-    if (hasSearched) void runSearch({ jobs, cities, contracts: nextContracts, experience });
+    if (hasSearched) void runSearch({ jobs, cities, contracts: nextContracts, experience }, expandsSelection ? offers : []);
   }
 
   function changeExperience(value: ExperienceFilter) {

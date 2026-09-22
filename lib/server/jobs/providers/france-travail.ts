@@ -83,6 +83,7 @@ async function fetchVariant(
   communeCode: string | null,
   token: string,
   contract?: ContractType,
+  attempt = 0,
 ): Promise<JobOffer[]> {
   const { franceTravail } = getServerConfig();
   const url = new URL(`${franceTravail.apiBaseUrl.replace(/\/$/, "")}/offres/search`);
@@ -99,6 +100,10 @@ async function fetchVariant(
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     cache: "no-store",
   });
+  if (response.status === 429 && attempt < 2) {
+    await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+    return fetchVariant(query, keyword, communeCode, token, contract, attempt + 1);
+  }
   if (response.status === 204) return [];
   if (!response.ok) {
     const detail = await response.text();
@@ -123,14 +128,22 @@ export async function searchFranceTravail(query: JobSearchQuery): Promise<JobOff
     getAccessToken(),
     Promise.all(effectiveLocations.map(resolveCommuneCode)),
   ]);
-  const batches = await Promise.all(
-    effectiveJobs.flatMap((job) => communeCodes.flatMap((communeCode) =>
+  const tasks = effectiveJobs.flatMap((job) => communeCodes.flatMap((communeCode) =>
       contractVariants.map((contract) =>
-        fetchVariant(query, keywordForContract(job, contract), communeCode, token, contract),
+        () => fetchVariant(query, keywordForContract(job, contract), communeCode, token, contract),
       ),
-    ),
-    ),
-  );
+    ));
+  const settled: PromiseSettledResult<JobOffer[]>[] = [];
+  for (let index = 0; index < tasks.length; index += 4) {
+    settled.push(...await Promise.allSettled(tasks.slice(index, index + 4).map((task) => task())));
+  }
+  const batches = settled
+    .filter((result): result is PromiseFulfilledResult<JobOffer[]> => result.status === "fulfilled")
+    .map((result) => result.value);
+  if (batches.length === 0) {
+    const failure = settled.find((result): result is PromiseRejectedResult => result.status === "rejected");
+    throw failure?.reason ?? new Error("France Travail n’a renvoyé aucun résultat exploitable.");
+  }
   const deduplicated = new Map(batches.flat().map((offer) => [offer.id, offer]));
 
   return [...deduplicated.values()]
