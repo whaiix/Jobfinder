@@ -15,6 +15,7 @@ const aggregatorHosts = [
   "cadremploi.fr", "meteojob.com", "profilculture.com", "lyon-emplois.com",
   "francetravail.fr", "welcometothejungle.com", "glassdoor.fr", "talent.com",
   "linkedin.com", "instagram.com", "emploi-territorial.fr", "choisirleservicepublic.gouv.fr",
+  "jobculture.fr", "isarta.fr",
 ];
 
 function cleanCompany(value: string) {
@@ -35,7 +36,9 @@ function extractCompany(source: WebSearchResult, hostname: string) {
 
   const isAggregator = aggregatorHosts.some((host) => hostname === host || hostname.endsWith(`.${host}`));
   if (isAggregator) return "Employeur à vérifier";
-  const domain = hostname.split(".")[0] ?? hostname;
+  const parts = hostname.split(".");
+  const genericSubdomains = new Set(["carriere", "career", "careers", "jobs", "recrutement", "emploi"]);
+  const domain = genericSubdomains.has(parts[0] ?? "") && parts.length >= 3 ? parts[1] : parts[0] ?? hostname;
   return domain.split("-").filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 }
 

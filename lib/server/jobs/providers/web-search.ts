@@ -6,6 +6,23 @@ import { getServerConfig } from "../../config";
 
 type SerperResponse = { organic?: WebSearchResult[] };
 
+const conflictingPlaces = [
+  "paris", "nantes", "alencon", "la rochelle", "la reunion", "marseille", "toulouse",
+  "bordeaux", "lille", "rennes", "strasbourg", "montpellier", "nice", "grenoble",
+  "dijon", "angers", "brest", "rouen", "caen", "clermont-ferrand", "toulon",
+];
+
+function normalize(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function isSearchListing(title: string) {
+  return /\b(?:emplois?|offres? d['’]emploi)\b.*\b(?:plus de\s*)?\d+\s+offres?\b|\bvoir les dernières offres\b/i.test(title)
+    || /^emplois?\s+/i.test(title)
+    || /^offres? d['’]emploi\s+/i.test(title)
+    || /^\d+\s+offres? d['’]emploi/i.test(title);
+}
+
 function buildQuery(query: JobSearchQuery, jobs: string[], contract?: ContractType) {
   const locations = splitSearchTerms(query.location);
   const jobPart = jobs.length ? `(${jobs.map((job) => `"${job}"`).join(" OR ")})` : "emploi";
@@ -33,7 +50,7 @@ export async function searchWeb(query: JobSearchQuery): Promise<JobOffer[]> {
   const effectiveGroups = jobGroups.length
     ? [...new Set(jobGroups.flat())].map((job) => [job])
     : [["emploi"]];
-  const pagesPerGroup = Math.max(1, Math.ceil(5 / effectiveGroups.length));
+  const pagesPerGroup = Math.max(1, Math.ceil(10 / effectiveGroups.length));
   const contractVariants: Array<ContractType | undefined> = query.contracts.length
     ? query.contracts
     : [undefined];
@@ -46,11 +63,15 @@ export async function searchWeb(query: JobSearchQuery): Promise<JobOffer[]> {
   const locations = splitSearchTerms(query.location);
   const offers = pages.flat().map(mapWebSearchResult).filter((offer): offer is JobOffer => offer !== null)
     .filter((offer) => {
+      if (isSearchListing(offer.title)) return false;
       if (locations.length === 0) return true;
       const raw = offer.raw as WebSearchResult | undefined;
+      const normalizedTitle = normalize(raw?.title ?? offer.title);
+      const selectedLocations = locations.map(normalize);
+      if (conflictingPlaces.some((place) => normalizedTitle.includes(place) && !selectedLocations.some((selected) => selected.includes(place) || place.includes(selected)))) return false;
       const content = `${raw?.title ?? offer.title} ${raw?.snippet ?? ""} ${raw?.link ?? offer.applyUrl}`
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-      return locations.some((location) => content.includes(location.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()));
+      return selectedLocations.some((location) => content.includes(location));
     })
     .map((offer) => ({ ...offer, location: query.location || offer.location, city: query.location || offer.city }));
   return [...new Map(offers.map((offer) => [offer.id, offer])).values()];
