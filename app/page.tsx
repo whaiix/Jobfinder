@@ -21,7 +21,7 @@ export default function HomePage() {
           <div className="hero-proof">
             <span>Offres de moins de 30 jours</span>
             <span>Préférences mémorisées</span>
-            <span>Sources officielles</span>
+            <span>France Travail, Adzuna et Google</span>
           </div>
         </div>
         <div className="hero-visual" aria-label="Aperçu de JobPilot">
@@ -35,6 +35,13 @@ export default function HomePage() {
           </div>
           <div className="visual-insight"><span>✦</span><p><strong>Contrat vérifié</strong><br />Le titre et la description correspondent.</p></div>
         </div>
+      </section>
+
+      <section className="platform-strip" aria-label="Les points forts de JobPilot">
+        <div><strong>3 sources</strong><span>réunies au même endroit</span></div>
+        <div><strong>30 jours</strong><span>de fraîcheur maximum</span></div>
+        <div><strong>1 profil</strong><span>pour personnaliser vos résultats</span></div>
+        <div><strong>0 doublon</strong><span>parmi vos candidatures</span></div>
       </section>
 
       <section className="feature-section">
