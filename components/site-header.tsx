@@ -9,6 +9,8 @@ export function SiteHeader() {
       </Link>
       <nav className="main-nav" aria-label="Navigation principale">
         <Link href="/offres">Les offres</Link>
+        <Link href="/candidatures-spontanees">Candidature spontanée</Link>
+        <Link href="/suivi">Mon suivi</Link>
         <Link href="/profil">Mon profil</Link>
       </nav>
       <Link className="header-cta" href="/offres">Rechercher</Link>

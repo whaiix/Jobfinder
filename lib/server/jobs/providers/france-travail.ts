@@ -82,6 +82,7 @@ async function fetchVariant(
   keyword: string,
   communeCode: string | null,
   token: string,
+  contract?: ContractType,
 ): Promise<JobOffer[]> {
   const { franceTravail } = getServerConfig();
   const url = new URL(`${franceTravail.apiBaseUrl.replace(/\/$/, "")}/offres/search`);
@@ -90,9 +91,8 @@ async function fetchVariant(
     url.searchParams.set("commune", communeCode);
     url.searchParams.set("distance", String(query.radius));
   }
-  const singleContract = query.contracts.length === 1 ? query.contracts[0] : undefined;
-  if (singleContract === "cdi") url.searchParams.set("typeContrat", "CDI");
-  if (singleContract === "cdd") url.searchParams.set("typeContrat", "CDD");
+  if (contract === "cdi") url.searchParams.set("typeContrat", "CDI");
+  if (contract === "cdd") url.searchParams.set("typeContrat", "CDD");
   url.searchParams.set("range", `0-${Math.min(query.limit, 49)}`);
 
   const response = await fetch(url, {
@@ -116,15 +116,19 @@ export async function searchFranceTravail(query: JobSearchQuery): Promise<JobOff
   const locations = splitSearchTerms(query.location);
   const effectiveJobs = jobs.length > 0 ? jobs : [""];
   const effectiveLocations = locations.length > 0 ? locations : [""];
+  const contractVariants: Array<ContractType | undefined> = query.contracts.length > 0
+    ? query.contracts
+    : [undefined];
   const [token, communeCodes] = await Promise.all([
     getAccessToken(),
     Promise.all(effectiveLocations.map(resolveCommuneCode)),
   ]);
   const batches = await Promise.all(
-    effectiveJobs.flatMap((job) =>
-      communeCodes.map((communeCode) =>
-        fetchVariant(query, keywordForContract(job, query.contracts.length === 1 ? query.contracts[0] : undefined), communeCode, token),
+    effectiveJobs.flatMap((job) => communeCodes.flatMap((communeCode) =>
+      contractVariants.map((contract) =>
+        fetchVariant(query, keywordForContract(job, contract), communeCode, token, contract),
       ),
+    ),
     ),
   );
   const deduplicated = new Map(batches.flat().map((offer) => [offer.id, offer]));

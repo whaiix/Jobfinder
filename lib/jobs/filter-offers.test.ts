@@ -42,6 +42,15 @@ describe("offer quality filter", () => {
     expect(result.map((item) => item.id)).toEqual(["1"]);
   });
 
+  it("keeps the union when several contract types are selected", () => {
+    const result = filterAndSortOffers([
+      offer({ id: "cdi", contract: "cdi" }),
+      offer({ id: "cdd", contract: "cdd" }),
+      offer({ id: "stage", contract: "stage" }),
+    ], { ...query, contracts: ["cdi", "cdd"] });
+    expect(result.map((item) => item.id).sort()).toEqual(["cdd", "cdi"]);
+  });
+
   it("sorts by compatibility and uses recency to break equal scores", () => {
     const result = filterAndSortOffers([
       offer({ id: "description", title: "Ingénieur logiciel", publishedAt: "2026-09-22T10:00:00.000Z" }),

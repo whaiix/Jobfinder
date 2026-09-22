@@ -2,7 +2,7 @@
 
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { calculateCvCompatibility, extractAtsKeywords, generateCoverLetters } from "@/lib/jobs/application-assistant";
-import { getSpontaneousTargets } from "@/lib/jobs/spontaneous";
+import { parseTrackedOffers, TRACKING_KEY, type TrackedOffer, type TrackingStatus } from "@/lib/jobs/tracking";
 import type { ContractType, ExperienceFilter, JobOffer } from "@/lib/jobs/types";
 import { analyzeProfile } from "@/lib/profile/analyze-profile";
 import { emptyProfile, parseStoredProfile, type ProfileData } from "@/lib/profile/profile-data";
@@ -24,9 +24,12 @@ const experienceOptions: Array<{ value: ExperienceFilter; label: string }> = [
   { value: "5+", label: "5 ans et +" },
 ];
 
-function ChipInput({ label, placeholder, values, draft, onDraft, onAdd, onRemove }: {
+function ChipInput({ id, label, placeholder, values, draft, onDraft, onAdd, onRemove, suggestions = [], onSuggestion }: {
+  id: string;
   label: string; placeholder: string; values: string[]; draft: string;
   onDraft: (value: string) => void; onAdd: () => void; onRemove: (value: string) => void;
+  suggestions?: Array<{ name: string; label: string }>;
+  onSuggestion?: (value: string) => void;
 }) {
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if ((event.key === "Enter" || event.key === ",") && draft.trim()) {
@@ -34,14 +37,15 @@ function ChipInput({ label, placeholder, values, draft, onDraft, onAdd, onRemove
     }
   }
   return (
-    <label className="chip-field">
-      <span className="field-label">{label}</span>
+    <div className="chip-field">
+      <label className="field-label" htmlFor={id}>{label}</label>
       <div className="chip-input-shell">
         {values.map((value) => <button key={value} type="button" className="input-chip" onClick={() => onRemove(value)}>{value}<span>×</span></button>)}
-        <input value={draft} onChange={(event) => onDraft(event.target.value)} onKeyDown={handleKeyDown} onBlur={onAdd} placeholder={values.length ? "Ajouter…" : placeholder} disabled={values.length >= 3} />
+        <input id={id} autoComplete="off" value={draft} onChange={(event) => onDraft(event.target.value)} onKeyDown={handleKeyDown} placeholder={values.length ? "Ajouter…" : placeholder} disabled={values.length >= 3} />
       </div>
+      {suggestions.length > 0 && draft.trim().length >= 2 && <div className="field-suggestions">{suggestions.map((suggestion) => <button type="button" key={`${suggestion.name}-${suggestion.label}`} onMouseDown={(event) => event.preventDefault()} onClick={() => onSuggestion?.(suggestion.name)}><strong>{suggestion.name}</strong><span>{suggestion.label}</span></button>)}</div>}
       <small>Entrée pour ajouter · 3 maximum</small>
-    </label>
+    </div>
   );
 }
 
@@ -50,8 +54,9 @@ export function SearchExperience({ initialOffers }: Props) {
   const [cities, setCities] = useState<string[]>([]);
   const [jobDraft, setJobDraft] = useState("");
   const [cityDraft, setCityDraft] = useState("");
+  const [citySuggestions, setCitySuggestions] = useState<Array<{ name: string; label: string }>>([]);
   const [recommendedJobs, setRecommendedJobs] = useState<string[]>([]);
-  const [activeView, setActiveView] = useState<"offers" | "spontaneous">("offers");
+  const [trackedOffers, setTrackedOffers] = useState<TrackedOffer[]>([]);
   const [contracts, setContracts] = useState<ContractType[]>([]);
   const [experience, setExperience] = useState<ExperienceFilter>("all");
   const [profileData, setProfileData] = useState<ProfileData>(emptyProfile);
@@ -78,8 +83,28 @@ export function SearchExperience({ initialOffers }: Props) {
       const profile = parseStoredProfile(localStorage.getItem(PROFILE_KEY));
       setProfileData(profile);
       setRecommendedJobs(analyzeProfile(profile.cvText).recommendations.slice(0, 3).map((item) => item.title));
+      setTrackedOffers(parseTrackedOffers(localStorage.getItem(TRACKING_KEY)));
     } catch { /* Une préférence corrompue est simplement ignorée. */ }
   }, []);
+
+  useEffect(() => {
+    const term = cityDraft.trim();
+    if (term.length < 2 || cities.length >= 3) {
+      setCitySuggestions([]);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/locations?q=${encodeURIComponent(term)}`, { signal: controller.signal });
+        const data = (await response.json()) as { suggestions?: Array<{ name: string; label: string }> };
+        setCitySuggestions((data.suggestions ?? []).filter((suggestion) => !cities.some((city) => city.toLowerCase() === suggestion.name.toLowerCase())));
+      } catch {
+        if (!controller.signal.aborted) setCitySuggestions([]);
+      }
+    }, 220);
+    return () => { controller.abort(); window.clearTimeout(timer); };
+  }, [cityDraft, cities]);
 
   useEffect(() => {
     if (!selectedOffer) return;
@@ -92,7 +117,6 @@ export function SearchExperience({ initialOffers }: Props) {
   const categoryCounts = useMemo(() => offers.reduce<Record<string, number>>((counts, offer) => {
     counts[offer.contract] = (counts[offer.contract] ?? 0) + 1; return counts;
   }, {}), [offers]);
-  const spontaneousTargets = useMemo(() => getSpontaneousTargets(jobs), [jobs]);
 
   function addValue(draft: string, values: string[], setter: (value: string[]) => void, clear: () => void) {
     const value = draft.replace(/,$/, "").trim();
@@ -108,6 +132,25 @@ export function SearchExperience({ initialOffers }: Props) {
     if (jobs.length < 3) setJobs([...jobs, job]);
   }
 
+  function addCitySuggestion(city: string) {
+    if (cities.length < 3 && !cities.some((item) => item.toLowerCase() === city.toLowerCase())) setCities([...cities, city]);
+    setCityDraft("");
+    setCitySuggestions([]);
+  }
+
+  function saveTracking(offer: JobOffer, status: TrackingStatus) {
+    const existing = trackedOffers.find((item) => item.offer.id === offer.id);
+    const next = existing?.status === status && status === "favorite"
+      ? trackedOffers.filter((item) => item.offer.id !== offer.id)
+      : [...trackedOffers.filter((item) => item.offer.id !== offer.id), { offer, status, savedAt: new Date().toISOString() }];
+    setTrackedOffers(next);
+    localStorage.setItem(TRACKING_KEY, JSON.stringify(next));
+    if (status === "applied") {
+      setOffers((current) => current.filter((item) => item.id !== offer.id));
+      setSelectedOffer(null);
+    }
+  }
+
   async function runSearch(selection: { jobs: string[]; cities: string[]; contracts: ContractType[]; experience: ExperienceFilter }) {
     const requestId = ++searchRequestRef.current;
     const { jobs: nextJobs, cities: nextCities, contracts: nextContracts, experience: nextExperience } = selection;
@@ -121,7 +164,8 @@ export function SearchExperience({ initialOffers }: Props) {
       const data = (await response.json()) as { offers: JobOffer[]; meta: SearchMeta };
       if (!response.ok) throw new Error("La recherche n’a pas pu être effectuée.");
       if (requestId !== searchRequestRef.current) return;
-      const scored = data.offers.map((offer) => ({ ...offer, compatibilityScore: calculateCvCompatibility(offer, profileData.cvText) }))
+      const appliedIds = new Set(parseTrackedOffers(localStorage.getItem(TRACKING_KEY)).filter((item) => item.status === "applied").map((item) => item.offer.id));
+      const scored = data.offers.filter((offer) => !appliedIds.has(offer.id)).map((offer) => ({ ...offer, compatibilityScore: calculateCvCompatibility(offer, profileData.cvText) }))
         .sort((left, right) => (right.compatibilityScore ?? 0) - (left.compatibilityScore ?? 0) || Date.parse(right.publishedAt) - Date.parse(left.publishedAt));
       setOffers(scored); setSearchMeta(data.meta);
     } catch (error) {
@@ -172,7 +216,7 @@ export function SearchExperience({ initialOffers }: Props) {
         <form className="advanced-search" onSubmit={search}>
           <div className="multi-fields">
             <div>
-              <ChipInput label="Métiers" placeholder="Ex. développeur web" values={jobs} draft={jobDraft} onDraft={setJobDraft} onAdd={() => addValue(jobDraft, jobs, setJobs, () => setJobDraft(""))} onRemove={(value) => setJobs(jobs.filter((item) => item !== value))} />
+              <ChipInput id="job-search" label="Métiers" placeholder="Ex. développeur web" values={jobs} draft={jobDraft} onDraft={setJobDraft} onAdd={() => addValue(jobDraft, jobs, setJobs, () => setJobDraft(""))} onRemove={(value) => setJobs(jobs.filter((item) => item !== value))} />
               {recommendedJobs.length > 0 && (
                 <div className="recommended-job-picker">
                   <span>Recommandés depuis votre CV</span>
@@ -185,7 +229,7 @@ export function SearchExperience({ initialOffers }: Props) {
                 </div>
               )}
             </div>
-            <ChipInput label="Villes" placeholder="Ex. Paris" values={cities} draft={cityDraft} onDraft={setCityDraft} onAdd={() => addValue(cityDraft, cities, setCities, () => setCityDraft(""))} onRemove={(value) => setCities(cities.filter((item) => item !== value))} />
+            <ChipInput id="city-search" label="Villes" placeholder="Ex. Paris" values={cities} draft={cityDraft} onDraft={setCityDraft} onAdd={() => addValue(cityDraft, cities, setCities, () => setCityDraft(""))} onRemove={(value) => setCities(cities.filter((item) => item !== value))} suggestions={citySuggestions} onSuggestion={addCitySuggestion} />
           </div>
           <div className="filter-row">
             <div className="contract-tabs" aria-label="Type de contrat">
@@ -200,12 +244,7 @@ export function SearchExperience({ initialOffers }: Props) {
           <p className="memory-note">Vos critères sont mémorisés dans ce navigateur pour votre prochaine visite.</p>
         </form>
 
-        <div className="search-mode-tabs" role="tablist" aria-label="Type de recherche">
-          <button type="button" role="tab" aria-selected={activeView === "offers"} className={activeView === "offers" ? "active" : ""} onClick={() => setActiveView("offers")}>Offres d’emploi</button>
-          <button type="button" role="tab" aria-selected={activeView === "spontaneous"} className={activeView === "spontaneous" ? "active" : ""} onClick={() => setActiveView("spontaneous")}>Candidature spontanée</button>
-        </div>
-
-        {activeView === "offers" ? <>
+        <>
           <div className="results-header">
             <div><p className="eyebrow">Résultats</p><h2>{hasSearched ? `${offers.length} offre${offers.length > 1 ? "s" : ""} compatible${offers.length > 1 ? "s" : ""}` : "Lancez votre recherche"}</h2></div>
             <div className="result-notes"><span>30 jours maximum</span><span>{searchMeta.mode === "live" ? `${searchMeta.sources.join(" + ")} en direct` : searchMeta.mode === "database" ? "Résultats enregistrés" : searchMeta.sources.length ? `${searchMeta.sources.join(" + ")} consultés` : "Sources officielles"}</span></div>
@@ -213,8 +252,10 @@ export function SearchExperience({ initialOffers }: Props) {
           {searchMeta.warnings.length > 0 && <div className="search-warning" role="status">{searchMeta.warnings.join(" · ")}</div>}
 
           <div className="offer-list">
-            {offers.map((offer) => (
-              <button className="offer-card" type="button" key={offer.id} onClick={() => openOffer(offer)}>
+            {offers.map((offer) => {
+              const trackingStatus = trackedOffers.find((item) => item.offer.id === offer.id)?.status;
+              return <article className="offer-card" key={offer.id}>
+              <button className="offer-card-body" type="button" onClick={() => openOffer(offer)}>
                 {offer.experienceLevel === "unknown" && <span className="experience-warning">Expérience non indiquée par le recruteur</span>}
                 <div className="company-logo" aria-hidden="true">{offer.company.slice(0, 1).toUpperCase()}</div>
                 <div className="offer-main">
@@ -224,15 +265,13 @@ export function SearchExperience({ initialOffers }: Props) {
                 </div>
                 <span className="open-offer">Ouvrir <b>→</b></span>
               </button>
-            ))}
+              <button className={`favorite-button ${trackingStatus === "favorite" ? "active" : ""}`} type="button" aria-label={trackingStatus === "favorite" ? "Retirer des favoris" : "Ajouter aux favoris"} title={trackingStatus === "favorite" ? "Retirer des favoris" : "Ajouter aux favoris"} onClick={() => saveTracking(offer, "favorite")}>{trackingStatus === "favorite" ? "★" : "☆"}</button>
+              </article>;
+            })}
             {!loading && !hasSearched && <div className="empty-state"><span>⌕</span><h3>À vous de jouer</h3><p>Ajoutez jusqu’à trois métiers et trois villes, puis lancez la recherche.</p></div>}
             {!loading && hasSearched && offers.length === 0 && <div className="empty-state"><span>⌕</span><h3>Aucune offre correspondante</h3><p>Essayez d’élargir le métier ou le type de contrat.</p></div>}
           </div>
-        </> : <section className="spontaneous-section">
-          <div className="results-header"><div><p className="eyebrow">Démarche proactive</p><h2>Entreprises à contacter directement</h2></div><div className="result-notes"><span>Liens officiels vérifiés</span></div></div>
-          <p className="spontaneous-intro">Ces entreprises correspondent aux métiers sélectionnés. Consultez leur page officielle avant d’adapter votre candidature à leurs activités.</p>
-          {spontaneousTargets.length > 0 ? <div className="spontaneous-grid">{spontaneousTargets.map((target) => <article key={target.name}><div className="company-logo">{target.name.slice(0, 1)}</div><div><h3>{target.name}</h3><span>{target.location}</span><p>{target.description}</p></div><a href={target.contactUrl} target="_blank" rel="noreferrer noopener">Page contact ↗</a></article>)}</div> : <div className="empty-state"><span>✦</span><h3>Sélectionnez un métier</h3><p>Les contacts pertinents apparaîtront ici, notamment pour la communication, le marketing et le digital.</p></div>}
-        </section>}
+        </>
       </section>
 
       {selectedOffer && (
@@ -246,7 +285,7 @@ export function SearchExperience({ initialOffers }: Props) {
 
             {showAssistant && <div className="application-assistant" ref={assistantRef}><div className="assistant-heading"><div><p className="eyebrow">Assistant candidature</p><h3>Mots-clés ATS à reprendre naturellement</h3></div></div><div className="ats-keywords">{atsKeywords.map((keyword) => <span key={keyword}>{keyword}</span>)}</div><div className="letter-heading"><h3>Deux versions personnalisées</h3><button type="button" onClick={copyLetter}>{copied ? "Copiée ✓" : "Copier cette version"}</button></div><div className="letter-version-tabs"><button type="button" className={letterVersion === "direct" ? "active" : ""} onClick={() => { setLetterVersion("direct"); setCopied(false); }}>Version directe</button><button type="button" className={letterVersion === "narrative" ? "active" : ""} onClick={() => { setLetterVersion("narrative"); setCopied(false); }}>Version plus personnelle</button></div><pre>{coverLetter}</pre><small>Les éléments chiffrés viennent de l’annonce. Relisez et complétez avec un exemple précis de votre parcours.</small></div>}
 
-            <footer className="modal-footer"><button className="assistant-button" type="button" onClick={openAssistant}>{showAssistant ? "Aller à l’assistant" : "Préparer ma candidature"}</button><a className="primary-link" href={selectedOffer.applyUrl} target="_blank" rel="noreferrer noopener">Voir l’offre originale <span>↗</span></a></footer>
+            <footer className="modal-footer"><div className="modal-tracking-actions"><button className="assistant-button" type="button" onClick={openAssistant}>{showAssistant ? "Aller à l’assistant" : "Préparer ma candidature"}</button><button className="assistant-button" type="button" onClick={() => saveTracking(selectedOffer, "favorite")}>{trackedOffers.some((item) => item.offer.id === selectedOffer.id && item.status === "favorite") ? "★ En favori" : "☆ Ajouter aux favoris"}</button><button className="assistant-button applied-button" type="button" onClick={() => saveTracking(selectedOffer, "applied")}>✓ J’ai postulé</button></div><a className="primary-link" href={selectedOffer.applyUrl} target="_blank" rel="noreferrer noopener">Voir l’offre originale <span>↗</span></a></footer>
           </section>
         </div>
       )}

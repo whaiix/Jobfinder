@@ -6,10 +6,13 @@ Première étape d’un agrégateur d’offres inspiré du fonctionnement de Pis
 
 - landing page responsive blanche, bleu foncé et bleu électrique ;
 - page de recherche dédiée avec plusieurs métiers et plusieurs villes ;
+- autocomplétion des villes françaises (par exemple `Ly` → Lyon) ;
 - sélection simultanée de plusieurs contrats, avec mise à jour automatique ;
 - filtre d'expérience de 0–1 an à 5 ans et plus ;
 - exclusion stricte des offres de plus de 30 jours ;
 - préférences enregistrées dans le navigateur ;
+- favoris, suivi des candidatures et exclusion des offres déjà postulées ;
+- page distincte de candidatures spontanées avec contacts d’entreprises ;
 - aperçu court et fiche complète de chaque annonce ;
 - score de compatibilité CV/offre, mots-clés ATS et deux lettres adaptées ;
 - analyse locale du texte du CV et recommandations de métiers ;
