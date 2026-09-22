@@ -12,7 +12,7 @@ Première étape d’un agrégateur d’offres inspiré du fonctionnement de Pis
 - exclusion stricte des offres de plus de 30 jours ;
 - préférences enregistrées dans le navigateur ;
 - favoris, suivi des candidatures et exclusion des offres déjà postulées ;
-- page distincte de candidatures spontanées avec contacts d’entreprises ;
+- page distincte de candidatures spontanées avec saisie multi-métiers/multi-villes et recherche Serper de pages Contact ou Recrutement ;
 - aperçu court et fiche complète de chaque annonce ;
 - score de compatibilité CV/offre, mots-clés ATS et deux lettres adaptées ;
 - analyse locale du texte du CV et recommandations de métiers ;

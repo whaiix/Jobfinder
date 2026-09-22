@@ -4,6 +4,8 @@ export type SpontaneousTarget = {
   location: string;
   contactUrl: string;
   specialties: string[];
+  source?: "verified" | "serper";
+  pageType?: "contact" | "careers" | "website";
 };
 
 const communicationTargets: SpontaneousTarget[] = [
@@ -18,12 +20,13 @@ function normalize(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
-export function getSpontaneousTargets(jobs: string[]): SpontaneousTarget[] {
+export function getSpontaneousTargets(jobs: string[], cities: string[] = []): SpontaneousTarget[] {
   if (jobs.length === 0) return [];
   const terms = normalize(jobs.join(" "));
+  const normalizedCities = cities.map(normalize);
   return communicationTargets
     .map((target) => ({ target, score: target.specialties.filter((specialty) => terms.includes(normalize(specialty))).length }))
-    .filter(({ score }) => score > 0)
+    .filter(({ target, score }) => score > 0 && (normalizedCities.length === 0 || normalizedCities.some((city) => normalize(target.location).includes(city))))
     .sort((left, right) => right.score - left.score)
-    .map(({ target }) => target);
+    .map(({ target }) => ({ ...target, source: "verified" as const, pageType: "contact" as const }));
 }
