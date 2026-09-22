@@ -6,8 +6,10 @@ describe("web search mapper", () => {
     expect(parseWebDate("Il y a 2 jours", new Date("2026-09-22T12:00:00Z"))).toBe("2026-09-20T12:00:00.000Z");
   });
 
-  it("rejects a result without a verifiable publication date", () => {
-    expect(mapWebSearchResult({ title: "Webmaster", link: "https://example.com/job" })).toBeNull();
+  it("labels a monthly Google result whose exact date is unavailable", () => {
+    const offer = mapWebSearchResult({ title: "Webmaster", link: "https://example.com/job" });
+    expect(offer?.publicationDateVerified).toBe(false);
+    expect(offer?.publishedLabel).toContain("Date non précisée");
   });
 
   it("extracts the real employer from a HelloWork snippet", () => {

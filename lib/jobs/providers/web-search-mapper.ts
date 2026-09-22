@@ -57,8 +57,8 @@ export function parseWebDate(value?: string, now = new Date()): string | null {
 }
 
 export function mapWebSearchResult(source: WebSearchResult): JobOffer | null {
-  const publishedAt = parseWebDate(source.date);
-  if (!source.link || !publishedAt) return null;
+  const parsedDate = parseWebDate(source.date);
+  if (!source.link) return null;
   let hostname = "site-employeur.fr";
   try { hostname = new URL(source.link).hostname.replace(/^www\./, "").toLowerCase(); } catch { /* URL déjà validée par le fournisseur. */ }
   const company = extractCompany(source, hostname);
@@ -69,7 +69,8 @@ export function mapWebSearchResult(source: WebSearchResult): JobOffer | null {
     company,
     location: "France",
     description: source.snippet?.trim() || "Consultez la page source pour lire l’offre complète.",
-    publishedAt,
+    publishedAt: parsedDate ?? new Date().toISOString(),
+    publicationDateVerified: Boolean(parsedDate),
     applyUrl: source.link,
     raw: source,
   };

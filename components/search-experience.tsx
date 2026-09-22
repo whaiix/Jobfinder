@@ -212,7 +212,7 @@ export function SearchExperience({ initialOffers }: Props) {
   return (
     <>
       <section className="search-hero">
-        <div><p className="eyebrow">Offres vérifiées et récentes</p><h1>Votre recherche,<br /><span>sans faux positifs.</span></h1><p>Les annonces de plus de 30 jours sont écartées. Le contrat et l’expérience sont aussi contrôlés dans le titre et la description.</p></div>
+        <div><p className="eyebrow">Offres vérifiées et récentes</p><h1>Votre recherche,<br /><span>sans faux positifs.</span></h1><p>Les annonces sont limitées au dernier mois. Le contrat, le métier et l’expérience sont contrôlés dans le titre et la description.</p></div>
       </section>
 
       <section className="search-workspace">

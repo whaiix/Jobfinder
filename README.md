@@ -121,4 +121,5 @@ normalisés y sont enregistrés puis servent de repli. Aucune offre fictive n'es
 - **Google** : Google ne fournit plus sa Custom Search JSON API aux nouveaux clients. Le connecteur
   web utilise donc l’API Serper lorsqu’une clé `SERPER_API_KEY` est configurée. Les requêtes sont
   réparties entre les métiers et contrats, et seuls les résultats localisés dont la date est vérifiable
-  et inférieure à 30 jours sont gardés.
+  et limités par Google au dernier mois sont gardés. Quand Google ne fournit pas la date exacte,
+  l’interface le signale explicitement au lieu d’inventer une date de publication.

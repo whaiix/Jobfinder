@@ -22,6 +22,7 @@ export type RawJobOffer = {
   description: string;
   experienceText?: string | null;
   publishedAt: string;
+  publicationDateVerified?: boolean;
   expiresAt?: string | null;
   applyUrl: string;
   raw?: unknown;

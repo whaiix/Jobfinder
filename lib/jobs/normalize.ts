@@ -26,7 +26,9 @@ export function normalizeOffer(rawOffer: RawJobOffer): JobOffer {
     contract: classification.contract,
     contractLabel: contractLabels[classification.contract],
     classificationReason: classification.reason,
-    publishedLabel: formatPublishedDate(rawOffer.publishedAt),
+    publishedLabel: rawOffer.publicationDateVerified === false
+      ? "Date non précisée · résultat Google du dernier mois"
+      : formatPublishedDate(rawOffer.publishedAt),
     experienceLevel: experience.level,
     experienceLabel: experience.label,
     experienceReason: experience.reason,
