@@ -19,7 +19,7 @@ Première étape d’un agrégateur d’offres inspiré du fonctionnement de Pis
 - endpoint local `GET /api/jobs/search` ;
 - connecteur serveur France Travail avec OAuth et géocodage des communes ;
 - connecteur Adzuna via l'API officielle ;
-- recherche web optionnelle sur les cinq premières pages Google via l’API Serper ;
+- recherche web optionnelle via Serper, répartie entre chaque métier et chaque contrat sélectionnés ;
 - agrégation parallèle et déduplication inter-sources ;
 - persistance PostgreSQL optionnelle ;
 - schéma d’offre normalisé ;
@@ -119,5 +119,6 @@ normalisés y sont enregistrés puis servent de repli. Aucune offre fictive n'es
 - **HelloWork** : aucun scraper n'est inclus, leurs conditions interdisant l'extraction par
   scraping. Une intégration nécessitera un accord ou un flux partenaire explicite.
 - **Google** : Google ne fournit plus sa Custom Search JSON API aux nouveaux clients. Le connecteur
-  web utilise donc l’API Serper lorsqu’une clé `SERPER_API_KEY` est configurée. Cinq pages sont
-  interrogées et seuls les résultats dont la date est vérifiable et inférieure à 30 jours sont gardés.
+  web utilise donc l’API Serper lorsqu’une clé `SERPER_API_KEY` est configurée. Les requêtes sont
+  réparties entre les métiers et contrats, et seuls les résultats localisés dont la date est vérifiable
+  et inférieure à 30 jours sont gardés.

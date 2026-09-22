@@ -22,7 +22,7 @@ export async function searchJobs(query: JobSearchQuery): Promise<JobSearchResult
     providers.push({ name: "Adzuna", search: () => searchAdzuna(query) });
   }
   if (hasSerperCredentials()) {
-    providers.push({ name: "Web (5 pages Google)", search: () => searchWeb(query) });
+    providers.push({ name: "Web (Google ciblé)", search: () => searchWeb(query) });
   }
 
   if (providers.length > 0) {

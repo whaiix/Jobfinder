@@ -74,7 +74,7 @@ export function filterAndSortOffers(offers: JobOffer[], query: JobSearchQuery): 
   const jobs = expandJobSearchTerms(query.query);
   const locations = splitSearchTerms(query.location);
   const filtered = offers.filter((offer) => {
-    const matchesJob = includesAny(`${offer.title} ${offer.description} ${offer.company}`, jobs);
+    const matchesJob = includesAny(offer.title, jobs);
     const matchesLocation = includesAny(
       `${offer.location} ${offer.city ?? ""} ${offer.postalCode ?? ""}`,
       locations,

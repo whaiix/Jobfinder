@@ -14,6 +14,7 @@ const aggregatorHosts = [
   "hellowork.com", "jobijoba.com", "adzuna.fr", "indeed.com", "apec.fr",
   "cadremploi.fr", "meteojob.com", "profilculture.com", "lyon-emplois.com",
   "francetravail.fr", "welcometothejungle.com", "glassdoor.fr", "talent.com",
+  "linkedin.com", "instagram.com", "emploi-territorial.fr", "choisirleservicepublic.gouv.fr",
 ];
 
 function cleanCompany(value: string) {
@@ -28,7 +29,7 @@ function extractCompany(source: WebSearchResult, hostname: string) {
   if (candidate && !/^(?:un|une|le|la|les|notre|son)\b|client|compte/i.test(candidate)) return candidate;
 
   if (hostname.endsWith("profilculture.com")) {
-    const commaEmployer = source.title?.split(",")[1]?.trim();
+    const commaEmployer = source.title?.match(/^[^-]+-\s*([^,]+),/)?.[1]?.trim();
     if (commaEmployer && commaEmployer.length <= 80) return commaEmployer;
   }
 

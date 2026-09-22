@@ -49,6 +49,13 @@ describe("offer quality filter", () => {
     expect(result.map((item) => item.id)).toEqual(["1"]);
   });
 
+  it("rejects an offer when the job only appears incidentally in its description", () => {
+    const result = filterAndSortOffers([
+      offer({ id: "commercial", title: "Commercial itinérant", description: "Utilisation ponctuelle de React pour communiquer avec l’équipe." }),
+    ], query);
+    expect(result).toEqual([]);
+  });
+
   it("keeps the union when several contract types are selected", () => {
     const result = filterAndSortOffers([
       offer({ id: "cdi", contract: "cdi" }),
@@ -58,13 +65,11 @@ describe("offer quality filter", () => {
     expect(result.map((item) => item.id).sort()).toEqual(["cdd", "cdi"]);
   });
 
-  it("sorts by compatibility and uses recency to break equal scores", () => {
+  it("sorts equally relevant offers by recency", () => {
     const result = filterAndSortOffers([
-      offer({ id: "description", title: "Ingénieur logiciel", publishedAt: "2026-09-22T10:00:00.000Z" }),
       offer({ id: "older-title", publishedAt: "2026-09-20T10:00:00.000Z" }),
       offer({ id: "newer-title", publishedAt: "2026-09-21T10:00:00.000Z" }),
     ], query);
-    expect(result.map((item) => item.id)).toEqual(["newer-title", "older-title", "description"]);
-    expect(result[0]?.compatibilityScore).toBeGreaterThan(result[2]?.compatibilityScore ?? 0);
+    expect(result.map((item) => item.id)).toEqual(["newer-title", "older-title"]);
   });
 });
