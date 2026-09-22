@@ -15,7 +15,7 @@ async function serperSearch(search: string): Promise<SerperOrganicResult[]> {
   const response = await fetch(serper.apiBaseUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-API-KEY": serper.apiKey },
-    body: JSON.stringify({ q: search, gl: "fr", hl: "fr", num: 20 }),
+    body: JSON.stringify({ q: search, gl: "fr", hl: "fr", num: 10 }),
     cache: "no-store",
     signal: AbortSignal.timeout(10_000),
   });
@@ -50,4 +50,3 @@ export async function searchSpontaneousTargets(jobs: string[], cities: string[])
     };
   }
 }
-
