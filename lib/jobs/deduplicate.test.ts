@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeOffer } from "./normalize";
-import { deduplicateOffers } from "./deduplicate";
+import { deduplicateOffers, enrichUnknownEmployers } from "./deduplicate";
 
 function offer(source: string, title: string) {
   return normalizeOffer({
@@ -34,5 +34,15 @@ describe("deduplicateOffers", () => {
     ]);
 
     expect(result).toHaveLength(2);
+  });
+
+  it("récupère l'employeur d'une annonce similaire provenant d'une autre source", () => {
+    const adzuna = offer("Adzuna", "Webmaster & Chargé de Communication Digitale Confirmé H/F");
+    const google = {
+      ...offer("Recherche Google", "Webmaster Junior & Chargé de Communication Digitale H/F Espace"),
+      company: "Employeur à vérifier",
+    };
+    const result = enrichUnknownEmployers([adzuna, google]);
+    expect(result[1]?.company).toBe("Acme SAS");
   });
 });

@@ -1,5 +1,5 @@
 import "server-only";
-import { deduplicateOffers } from "../../jobs/deduplicate";
+import { deduplicateOffers, enrichUnknownEmployers } from "../../jobs/deduplicate";
 import { filterAndSortOffers } from "../../jobs/filter-offers";
 import { toPublicOffer } from "../../jobs/normalize";
 import type { JobOffer, JobSearchQuery, JobSearchResult } from "../../jobs/types";
@@ -43,7 +43,7 @@ export async function searchJobs(query: JobSearchQuery): Promise<JobSearchResult
       }
     });
 
-    const uniqueOffers = filterAndSortOffers(deduplicateOffers(liveOffers), query).slice(
+    const uniqueOffers = filterAndSortOffers(deduplicateOffers(enrichUnknownEmployers(liveOffers)), query).slice(
       0,
       query.limit,
     );
