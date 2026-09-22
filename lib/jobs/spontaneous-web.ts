@@ -25,7 +25,9 @@ function includesTerm(value: string, terms: string[]) {
 }
 
 function companyName(hostname: string) {
-  const domain = hostname.replace(/^www\./, "").split(".")[0] ?? hostname;
+  const parts = hostname.replace(/^www\./, "").split(".");
+  const genericSubdomains = new Set(["recrutement", "recruitment", "career", "careers", "jobs", "contact"]);
+  const domain = genericSubdomains.has(parts[0] ?? "") && parts.length >= 3 ? parts[1] : parts[0] ?? hostname;
   return domain.split("-").filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 }
 
