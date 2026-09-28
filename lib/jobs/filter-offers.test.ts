@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expandJobSearchTerms, filterAndSortOffers, groupJobSearchTerms, isFreshOffer } from "./filter-offers";
+import { expandJobSearchTerms, filterAndSortOffers, groupJobSearchTerms, isFreshOffer, matchesExactJobTitle } from "./filter-offers";
 import type { JobOffer, JobSearchQuery } from "./types";
 
 const now = Date.parse("2026-09-22T12:00:00.000Z");
@@ -17,7 +17,7 @@ function offer(overrides: Partial<JobOffer> = {}): JobOffer {
 
 const query: JobSearchQuery = {
   query: "React", location: "Paris", contracts: ["cdi"], experience: "0-1",
-  radius: 30, limit: 50,
+  exactTitle: false, radius: 30, limit: 50,
 };
 
 describe("offer quality filter", () => {
@@ -54,6 +54,20 @@ describe("offer quality filter", () => {
       offer({ id: "commercial", title: "Commercial itinérant", description: "Utilisation ponctuelle de React pour communiquer avec l’équipe." }),
     ], query);
     expect(result).toEqual([]);
+  });
+
+  it("matches an exact requested job as a complete phrase in the offer title", () => {
+    expect(matchesExactJobTitle("Chargé de communication digitale H/F", "Chargé de communication")).toBe(true);
+    expect(matchesExactJobTitle("Assistant de communication H/F", "Chargé de communication")).toBe(false);
+  });
+
+  it("keeps any exact title when several jobs are selected", () => {
+    const result = filterAndSortOffers([
+      offer({ id: "webmaster", title: "Webmaster junior H/F" }),
+      offer({ id: "communication", title: "Chargé de communication digitale" }),
+      offer({ id: "approximation", title: "Community manager" }),
+    ], { ...query, query: "Webmaster,Chargé de communication", exactTitle: true });
+    expect(result.map((item) => item.id).sort()).toEqual(["communication", "webmaster"]);
   });
 
   it("keeps the union when several contract types are selected", () => {

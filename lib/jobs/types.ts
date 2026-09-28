@@ -44,6 +44,7 @@ export type JobSearchQuery = {
   location: string;
   contracts: ContractType[];
   experience: ExperienceFilter;
+  exactTitle: boolean;
   radius: number;
   limit: number;
 };

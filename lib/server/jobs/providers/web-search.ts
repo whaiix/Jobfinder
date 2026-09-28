@@ -46,7 +46,9 @@ async function fetchPage(search: string, page: number): Promise<WebSearchResult[
 }
 
 export async function searchWeb(query: JobSearchQuery): Promise<JobOffer[]> {
-  const jobGroups = groupJobSearchTerms(query.query);
+  const jobGroups = query.exactTitle
+    ? splitSearchTerms(query.query).map((job) => [job])
+    : groupJobSearchTerms(query.query);
   const effectiveGroups = jobGroups.length
     ? [...new Set(jobGroups.flat())].map((job) => [job])
     : [["emploi"]];

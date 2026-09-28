@@ -10,7 +10,7 @@ import { getServerConfig } from "../../config";
 type SearchResponse = { results?: AdzunaApiOffer[] };
 
 function keywords(query: JobSearchQuery, contract?: ContractType): string[] {
-  const jobs = expandJobSearchTerms(query.query);
+  const jobs = query.exactTitle ? splitSearchTerms(query.query) : expandJobSearchTerms(query.query);
   const values = jobs.length > 0 ? jobs : [""];
   if (contract === "stage") return values.map((value) => `${value} stage`.trim());
   if (contract === "alternance") {

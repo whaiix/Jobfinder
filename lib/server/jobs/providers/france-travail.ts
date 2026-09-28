@@ -117,7 +117,7 @@ async function fetchVariant(
 }
 
 export async function searchFranceTravail(query: JobSearchQuery): Promise<JobOffer[]> {
-  const jobs = expandJobSearchTerms(query.query);
+  const jobs = query.exactTitle ? splitSearchTerms(query.query) : expandJobSearchTerms(query.query);
   const locations = splitSearchTerms(query.location);
   const effectiveJobs = jobs.length > 0 ? jobs : [""];
   const effectiveLocations = locations.length > 0 ? locations : [""];

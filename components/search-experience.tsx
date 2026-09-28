@@ -9,7 +9,8 @@ import { emptyProfile, parseStoredProfile, type ProfileData } from "@/lib/profil
 
 type Props = { initialOffers: JobOffer[] };
 type SearchMeta = { mode: "live" | "database" | "empty"; sources: string[]; warnings: string[] };
-type Preferences = { jobs: string[]; cities: string[]; contracts: ContractType[]; experience: ExperienceFilter; contract?: ContractType | "all" };
+type Preferences = { jobs: string[]; cities: string[]; contracts: ContractType[]; experience: ExperienceFilter; exactTitle?: boolean; contract?: ContractType | "all" };
+type SearchSelection = { jobs: string[]; cities: string[]; contracts: ContractType[]; experience: ExperienceFilter; exactTitle: boolean };
 
 const PREFERENCES_KEY = "jobpilot-search-preferences-v2";
 const PROFILE_KEY = "jobpilot-profile-v1";
@@ -59,6 +60,7 @@ export function SearchExperience({ initialOffers }: Props) {
   const [trackedOffers, setTrackedOffers] = useState<TrackedOffer[]>([]);
   const [contracts, setContracts] = useState<ContractType[]>([]);
   const [experience, setExperience] = useState<ExperienceFilter>("all");
+  const [exactTitle, setExactTitle] = useState(false);
   const [profileData, setProfileData] = useState<ProfileData>(emptyProfile);
   const [offers, setOffers] = useState(initialOffers);
   const [loading, setLoading] = useState(false);
@@ -80,6 +82,7 @@ export function SearchExperience({ initialOffers }: Props) {
       if (saved?.contracts) setContracts(saved.contracts);
       else if (saved?.contract && saved.contract !== "all") setContracts([saved.contract]);
       if (saved?.experience) setExperience(saved.experience);
+      if (typeof saved?.exactTitle === "boolean") setExactTitle(saved.exactTitle);
       const profile = parseStoredProfile(localStorage.getItem(PROFILE_KEY));
       setProfileData(profile);
       setRecommendedJobs(analyzeProfile(profile.cvText).recommendations.slice(0, 3).map((item) => item.title));
@@ -151,14 +154,14 @@ export function SearchExperience({ initialOffers }: Props) {
     }
   }
 
-  async function runSearch(selection: { jobs: string[]; cities: string[]; contracts: ContractType[]; experience: ExperienceFilter }, preservedOffers: JobOffer[] = []) {
+  async function runSearch(selection: SearchSelection, preservedOffers: JobOffer[] = []) {
     const requestId = ++searchRequestRef.current;
-    const { jobs: nextJobs, cities: nextCities, contracts: nextContracts, experience: nextExperience } = selection;
+    const { jobs: nextJobs, cities: nextCities, contracts: nextContracts, experience: nextExperience, exactTitle: nextExactTitle } = selection;
     setJobs(nextJobs); setCities(nextCities); setJobDraft(""); setCityDraft("");
-    const preferences: Preferences = { jobs: nextJobs, cities: nextCities, contracts: nextContracts, experience: nextExperience };
+    const preferences: Preferences = { jobs: nextJobs, cities: nextCities, contracts: nextContracts, experience: nextExperience, exactTitle: nextExactTitle };
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
     setLoading(true); setHasSearched(true);
-    const params = new URLSearchParams({ q: nextJobs.join(","), location: nextCities.join(","), contract: nextContracts.length ? nextContracts.join(",") : "all", experience: nextExperience, limit: "100" });
+    const params = new URLSearchParams({ q: nextJobs.join(","), location: nextCities.join(","), contract: nextContracts.length ? nextContracts.join(",") : "all", experience: nextExperience, exact: String(nextExactTitle), limit: "100" });
     try {
       const response = await fetch(`/api/jobs/search?${params.toString()}`);
       const data = (await response.json()) as { offers: JobOffer[]; meta: SearchMeta };
@@ -180,19 +183,24 @@ export function SearchExperience({ initialOffers }: Props) {
     event?.preventDefault();
     const nextJobs = jobDraft.trim() && jobs.length < 3 ? [...jobs, jobDraft.trim()] : jobs;
     const nextCities = cityDraft.trim() && cities.length < 3 ? [...cities, cityDraft.trim()] : cities;
-    await runSearch({ jobs: nextJobs, cities: nextCities, contracts, experience });
+    await runSearch({ jobs: nextJobs, cities: nextCities, contracts, experience, exactTitle });
   }
 
   function toggleContract(value: ContractType | "all") {
     const nextContracts = value === "all" ? [] : contracts.includes(value) ? contracts.filter((item) => item !== value) : [...contracts, value];
     const expandsSelection = value === "all" || contracts.every((contract) => nextContracts.includes(contract));
     setContracts(nextContracts);
-    if (hasSearched) void runSearch({ jobs, cities, contracts: nextContracts, experience }, expandsSelection ? offers : []);
+    if (hasSearched) void runSearch({ jobs, cities, contracts: nextContracts, experience, exactTitle }, expandsSelection ? offers : []);
   }
 
   function changeExperience(value: ExperienceFilter) {
     setExperience(value);
-    if (hasSearched) void runSearch({ jobs, cities, contracts, experience: value });
+    if (hasSearched) void runSearch({ jobs, cities, contracts, experience: value, exactTitle });
+  }
+
+  function changeExactTitle(value: boolean) {
+    setExactTitle(value);
+    if (hasSearched) void runSearch({ jobs, cities, contracts, experience, exactTitle: value });
   }
 
   function openOffer(offer: JobOffer) { setSelectedOffer(offer); setShowAssistant(false); setLetterVersion("direct"); setCopied(false); }
@@ -244,13 +252,20 @@ export function SearchExperience({ initialOffers }: Props) {
             <label className="select-field"><span>Expérience</span><select value={experience} onChange={(event) => changeExperience(event.target.value as ExperienceFilter)}>{experienceOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
             <button className="primary-button" type="submit" disabled={loading}>{loading ? "Recherche…" : "Rechercher"}</button>
           </div>
-          <p className="memory-note">Vos critères sont mémorisés dans ce navigateur pour votre prochaine visite.</p>
+          <div className="search-options-row">
+            <label className="exact-title-toggle">
+              <input type="checkbox" checked={exactTitle} onChange={(event) => changeExactTitle(event.target.checked)} />
+              <span className="toggle-track" aria-hidden="true"><i /></span>
+              <span><strong>Poste exact</strong><small>Uniquement les titres contenant précisément le métier saisi</small></span>
+            </label>
+            <p className="memory-note">Vos critères sont mémorisés dans ce navigateur pour votre prochaine visite.</p>
+          </div>
         </form>
 
         <>
           <div className="results-header">
             <div><p className="eyebrow">Résultats</p><h2>{hasSearched ? `${offers.length} offre${offers.length > 1 ? "s" : ""} compatible${offers.length > 1 ? "s" : ""}` : "Lancez votre recherche"}</h2></div>
-            <div className="result-notes"><span>30 jours maximum</span><span>{searchMeta.mode === "live" ? `${searchMeta.sources.join(" + ")} en direct` : searchMeta.mode === "database" ? "Résultats enregistrés" : searchMeta.sources.length ? `${searchMeta.sources.join(" + ")} consultés` : "Sources officielles"}</span></div>
+            <div className="result-notes">{exactTitle && <span>Intitulé exact</span>}<span>30 jours maximum</span><span>{searchMeta.mode === "live" ? `${searchMeta.sources.join(" + ")} en direct` : searchMeta.mode === "database" ? "Résultats enregistrés" : searchMeta.sources.length ? `${searchMeta.sources.join(" + ")} consultés` : "Sources officielles"}</span></div>
           </div>
           {searchMeta.warnings.length > 0 && <div className="search-warning" role="status">{searchMeta.warnings.join(" · ")}</div>}
 

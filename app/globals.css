@@ -374,6 +374,18 @@ a, button, input, select { outline-color: var(--blue); }
 .select-field select { height: 47px; border-color: #c9d8ed; border-radius: 12px; padding: 0 12px; background-color: #fbfdff; }
 .filter-row .primary-button { min-height: 47px; }
 .memory-note { margin-top: 15px; }
+.search-options-row { display: flex; align-items: center; justify-content: space-between; gap: 22px; margin-top: 17px; }
+.search-options-row .memory-note { margin: 0; text-align: right; }
+.exact-title-toggle { display: inline-flex; align-items: center; gap: 11px; min-width: 0; cursor: pointer; user-select: none; }
+.exact-title-toggle input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+.toggle-track { position: relative; width: 42px; height: 24px; flex: 0 0 auto; border: 1px solid #b9c9de; border-radius: 999px; background: #e8eef6; transition: border-color .18s, background .18s, box-shadow .18s; }
+.toggle-track i { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(7,27,63,.22); transition: transform .2s; }
+.exact-title-toggle input:checked + .toggle-track { border-color: var(--blue); background: var(--blue); box-shadow: 0 6px 16px rgba(18,103,255,.2); }
+.exact-title-toggle input:checked + .toggle-track i { transform: translateX(18px); }
+.exact-title-toggle input:focus-visible + .toggle-track { outline: 3px solid rgba(18,103,255,.25); outline-offset: 3px; }
+.exact-title-toggle > span:last-child { display: grid; gap: 2px; }
+.exact-title-toggle strong { color: var(--navy); font-size: .76rem; }
+.exact-title-toggle small { color: #7a889d; font-size: .65rem; line-height: 1.35; }
 .search-mode-tabs { margin-top: 45px; border-radius: 15px; padding: 5px; }
 .search-mode-tabs button { border-radius: 11px; padding: 12px 19px; }
 
@@ -515,6 +527,8 @@ a, button, input, select { outline-color: var(--blue); }
   .advanced-search, .spontaneous-job-picker { padding: 20px; border-radius: 21px; }
   .filter-row { grid-template-columns: 1fr; }
   .filter-row .primary-button { grid-column: auto; }
+  .search-options-row { align-items: flex-start; flex-direction: column; }
+  .search-options-row .memory-note { text-align: left; }
   .offer-card-body { padding: 72px 20px 23px; }
   .content-page { margin-top: 42px; }
   .profile-page { padding: 58px 14px 90px; }

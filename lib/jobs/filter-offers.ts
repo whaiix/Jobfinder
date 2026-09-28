@@ -38,6 +38,23 @@ function includesAny(value: string, terms: string[]): boolean {
   return terms.some((term) => comparable.includes(term.toLocaleLowerCase("fr")));
 }
 
+function normalizeTitle(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("fr")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+export function matchesExactJobTitle(title: string, query: string): boolean {
+  const requestedJobs = splitSearchTerms(query).map(normalizeTitle).filter(Boolean);
+  if (requestedJobs.length === 0) return true;
+  const comparableTitle = ` ${normalizeTitle(title)} `;
+  return requestedJobs.some((job) => comparableTitle.includes(` ${job} `));
+}
+
 export function compatibilityScore(offer: JobOffer, query: JobSearchQuery): number {
   const jobs = expandJobSearchTerms(query.query);
   const locations = splitSearchTerms(query.location);
@@ -74,7 +91,9 @@ export function filterAndSortOffers(offers: JobOffer[], query: JobSearchQuery): 
   const jobs = expandJobSearchTerms(query.query);
   const locations = splitSearchTerms(query.location);
   const filtered = offers.filter((offer) => {
-    const matchesJob = includesAny(offer.title, jobs);
+    const matchesJob = query.exactTitle
+      ? matchesExactJobTitle(offer.title, query.query)
+      : includesAny(offer.title, jobs);
     const matchesLocation = includesAny(
       `${offer.location} ${offer.city ?? ""} ${offer.postalCode ?? ""}`,
       locations,
