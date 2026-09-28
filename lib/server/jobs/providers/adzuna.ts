@@ -27,7 +27,7 @@ async function fetchAdzunaLocation(query: JobSearchQuery, location: string, keyw
   const url = new URL(`${base}/jobs/${encodeURIComponent(adzuna.country)}/search/1`);
   url.searchParams.set("app_id", adzuna.appId);
   url.searchParams.set("app_key", adzuna.appKey);
-  url.searchParams.set("results_per_page", String(Math.min(query.limit * 2, 50)));
+  url.searchParams.set("results_per_page", "50");
   url.searchParams.set("content-type", "application/json");
   if (keyword) url.searchParams.set("what", keyword);
   if (location) url.searchParams.set("where", location);
@@ -44,16 +44,12 @@ async function fetchAdzunaLocation(query: JobSearchQuery, location: string, keyw
   }
 
   const payload = (await response.json()) as SearchResponse;
-  return (payload.results ?? [])
-    .map(mapAdzunaOffer)
-    .filter((offer) => query.contracts.length === 0 || query.contracts.includes(offer.contract));
+  return (payload.results ?? []).map(mapAdzunaOffer);
 }
 
 export async function searchAdzuna(query: JobSearchQuery): Promise<JobOffer[]> {
   const locations = splitSearchTerms(query.location);
-  const contractVariants: Array<ContractType | undefined> = query.contracts.length > 0
-    ? query.contracts
-    : [undefined];
+  const contractVariants: Array<ContractType | undefined> = [undefined, ...query.contracts];
   const tasks = (locations.length > 0 ? locations : [""]).flatMap((location) =>
     contractVariants.flatMap((contract) =>
       keywords(query, contract).map((keyword) => () => fetchAdzunaLocation(query, location, keyword, contract)),

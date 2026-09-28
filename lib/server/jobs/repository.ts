@@ -106,5 +106,5 @@ export async function searchStoredOffers(query: JobSearchQuery): Promise<JobOffe
     LIMIT 500
   `;
 
-  return filterAndSortOffers(deduplicateOffers(rows.map(rowToOffer)), query).slice(0, query.limit);
+  return filterAndSortOffers(deduplicateOffers(rows.map(rowToOffer)), { ...query, contracts: [] });
 }

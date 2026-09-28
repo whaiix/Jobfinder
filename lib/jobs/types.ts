@@ -46,7 +46,6 @@ export type JobSearchQuery = {
   experience: ExperienceFilter;
   exactTitle: boolean;
   radius: number;
-  limit: number;
 };
 
 export type JobSearchResult = {

@@ -10,7 +10,6 @@ export const jobSearchSchema = z.object({
   experience: z.enum(experienceValues).default("all"),
   exactTitle: z.boolean().default(false),
   radius: z.coerce.number().int().min(5).max(100).default(30),
-  limit: z.coerce.number().int().min(1).max(100).default(100),
 });
 
 export function parseJobSearchQuery(params: URLSearchParams) {
@@ -24,6 +23,5 @@ export function parseJobSearchQuery(params: URLSearchParams) {
     experience: params.get("experience") ?? "all",
     exactTitle: params.get("exact") === "true",
     radius: params.get("radius") ?? 30,
-    limit: params.get("limit") ?? 100,
   });
 }

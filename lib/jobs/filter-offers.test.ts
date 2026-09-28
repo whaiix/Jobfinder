@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expandJobSearchTerms, filterAndSortOffers, groupJobSearchTerms, isFreshOffer, matchesExactJobTitle } from "./filter-offers";
+import { expandJobSearchTerms, filterAndSortOffers, filterOffersByContracts, groupJobSearchTerms, isFreshOffer, matchesExactJobTitle } from "./filter-offers";
 import type { JobOffer, JobSearchQuery } from "./types";
 
 const now = Date.parse("2026-09-22T12:00:00.000Z");
@@ -17,7 +17,7 @@ function offer(overrides: Partial<JobOffer> = {}): JobOffer {
 
 const query: JobSearchQuery = {
   query: "React", location: "Paris", contracts: ["cdi"], experience: "0-1",
-  exactTitle: false, radius: 30, limit: 50,
+  exactTitle: false, radius: 30,
 };
 
 describe("offer quality filter", () => {
@@ -77,6 +77,21 @@ describe("offer quality filter", () => {
       offer({ id: "stage", contract: "stage" }),
     ], { ...query, contracts: ["cdi", "cdd"] });
     expect(result.map((item) => item.id).sort()).toEqual(["cdd", "cdi"]);
+  });
+
+  it("never reduces a contract union when another contract is selected", () => {
+    const catalog = [
+      offer({ id: "cdi-1", contract: "cdi" }),
+      offer({ id: "cdi-2", contract: "cdi" }),
+      offer({ id: "cdd-1", contract: "cdd" }),
+    ];
+    expect(filterOffersByContracts(catalog, ["cdi"])).toHaveLength(2);
+    expect(filterOffersByContracts(catalog, ["cdi", "cdd"])).toHaveLength(3);
+  });
+
+  it("does not impose an application-level maximum of one hundred offers", () => {
+    const manyOffers = Array.from({ length: 140 }, (_, index) => offer({ id: String(index) }));
+    expect(filterAndSortOffers(manyOffers, query)).toHaveLength(140);
   });
 
   it("sorts equally relevant offers by recency", () => {

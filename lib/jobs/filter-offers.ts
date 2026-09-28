@@ -55,6 +55,10 @@ export function matchesExactJobTitle(title: string, query: string): boolean {
   return requestedJobs.some((job) => comparableTitle.includes(` ${job} `));
 }
 
+export function filterOffersByContracts(offers: JobOffer[], contracts: JobSearchQuery["contracts"]): JobOffer[] {
+  return contracts.length === 0 ? offers : offers.filter((offer) => contracts.includes(offer.contract));
+}
+
 export function compatibilityScore(offer: JobOffer, query: JobSearchQuery): number {
   const jobs = expandJobSearchTerms(query.query);
   const locations = splitSearchTerms(query.location);

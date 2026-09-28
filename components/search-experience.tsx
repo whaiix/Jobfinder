@@ -2,6 +2,7 @@
 
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { calculateCvCompatibility, extractAtsKeywords, generateCoverLetters } from "@/lib/jobs/application-assistant";
+import { filterOffersByContracts } from "@/lib/jobs/filter-offers";
 import { parseTrackedOffers, TRACKING_KEY, type TrackedOffer, type TrackingStatus } from "@/lib/jobs/tracking";
 import type { ContractType, ExperienceFilter, JobOffer } from "@/lib/jobs/types";
 import { analyzeProfile } from "@/lib/profile/analyze-profile";
@@ -63,6 +64,7 @@ export function SearchExperience({ initialOffers }: Props) {
   const [exactTitle, setExactTitle] = useState(false);
   const [profileData, setProfileData] = useState<ProfileData>(emptyProfile);
   const [offers, setOffers] = useState(initialOffers);
+  const [availableOffers, setAvailableOffers] = useState(initialOffers);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<JobOffer | null>(null);
@@ -117,9 +119,9 @@ export function SearchExperience({ initialOffers }: Props) {
     return () => { document.removeEventListener("keydown", close); document.body.style.overflow = ""; };
   }, [selectedOffer]);
 
-  const categoryCounts = useMemo(() => offers.reduce<Record<string, number>>((counts, offer) => {
+  const categoryCounts = useMemo(() => availableOffers.reduce<Record<string, number>>((counts, offer) => {
     counts[offer.contract] = (counts[offer.contract] ?? 0) + 1; return counts;
-  }, {}), [offers]);
+  }, {}), [availableOffers]);
 
   function addValue(draft: string, values: string[], setter: (value: string[]) => void, clear: () => void) {
     const value = draft.replace(/,$/, "").trim();
@@ -150,6 +152,7 @@ export function SearchExperience({ initialOffers }: Props) {
     localStorage.setItem(TRACKING_KEY, JSON.stringify(next));
     if (status === "applied") {
       setOffers((current) => current.filter((item) => item.id !== offer.id));
+      setAvailableOffers((current) => current.filter((item) => item.id !== offer.id));
       setSelectedOffer(null);
     }
   }
@@ -161,21 +164,25 @@ export function SearchExperience({ initialOffers }: Props) {
     const preferences: Preferences = { jobs: nextJobs, cities: nextCities, contracts: nextContracts, experience: nextExperience, exactTitle: nextExactTitle };
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
     setLoading(true); setHasSearched(true);
-    const params = new URLSearchParams({ q: nextJobs.join(","), location: nextCities.join(","), contract: nextContracts.length ? nextContracts.join(",") : "all", experience: nextExperience, exact: String(nextExactTitle), limit: "100" });
+    const params = new URLSearchParams({ q: nextJobs.join(","), location: nextCities.join(","), contract: nextContracts.length ? nextContracts.join(",") : "all", experience: nextExperience, exact: String(nextExactTitle) });
+    const appliedIds = new Set(parseTrackedOffers(localStorage.getItem(TRACKING_KEY)).filter((item) => item.status === "applied").map((item) => item.offer.id));
     try {
       const response = await fetch(`/api/jobs/search?${params.toString()}`);
       const data = (await response.json()) as { offers: JobOffer[]; meta: SearchMeta };
       if (!response.ok) throw new Error("La recherche n’a pas pu être effectuée.");
       if (requestId !== searchRequestRef.current) return;
-      const appliedIds = new Set(parseTrackedOffers(localStorage.getItem(TRACKING_KEY)).filter((item) => item.status === "applied").map((item) => item.offer.id));
-      const merged = [...new Map([...preservedOffers, ...data.offers].map((offer) => [offer.id, offer])).values()]
-        .filter((offer) => nextContracts.length === 0 || nextContracts.includes(offer.contract));
+      const merged = [...new Map([...preservedOffers, ...data.offers].map((offer) => [offer.id, offer])).values()];
       const scored = merged.filter((offer) => !appliedIds.has(offer.id)).map((offer) => ({ ...offer, compatibilityScore: calculateCvCompatibility(offer, profileData.cvText) }))
         .sort((left, right) => (right.compatibilityScore ?? 0) - (left.compatibilityScore ?? 0) || Date.parse(right.publishedAt) - Date.parse(left.publishedAt));
-      setOffers(scored); setSearchMeta(data.meta);
+      setAvailableOffers(scored);
+      setOffers(filterOffersByContracts(scored, nextContracts));
+      setSearchMeta(data.meta);
     } catch (error) {
       if (requestId !== searchRequestRef.current) return;
-      setOffers([]); setSearchMeta({ mode: "empty", sources: [], warnings: [error instanceof Error ? error.message : "Erreur de recherche."] });
+      const fallbackOffers = preservedOffers.filter((offer) => !appliedIds.has(offer.id));
+      setAvailableOffers(fallbackOffers);
+      setOffers(filterOffersByContracts(fallbackOffers, nextContracts));
+      setSearchMeta({ mode: fallbackOffers.length ? "live" : "empty", sources: [], warnings: [error instanceof Error ? error.message : "Erreur de recherche."] });
     } finally { if (requestId === searchRequestRef.current) setLoading(false); }
   }
 
@@ -188,9 +195,11 @@ export function SearchExperience({ initialOffers }: Props) {
 
   function toggleContract(value: ContractType | "all") {
     const nextContracts = value === "all" ? [] : contracts.includes(value) ? contracts.filter((item) => item !== value) : [...contracts, value];
-    const expandsSelection = value === "all" || contracts.every((contract) => nextContracts.includes(contract));
     setContracts(nextContracts);
-    if (hasSearched) void runSearch({ jobs, cities, contracts: nextContracts, experience, exactTitle }, expandsSelection ? offers : []);
+    if (hasSearched) {
+      setOffers(filterOffersByContracts(availableOffers, nextContracts));
+      void runSearch({ jobs, cities, contracts: nextContracts, experience, exactTitle }, availableOffers);
+    }
   }
 
   function changeExperience(value: ExperienceFilter) {
@@ -246,7 +255,8 @@ export function SearchExperience({ initialOffers }: Props) {
             <div className="contract-tabs" aria-label="Type de contrat">
               {contractOptions.map((option) => {
                 const active = option.value === "all" ? contracts.length === 0 : contracts.includes(option.value);
-                return <button key={option.value} type="button" className={active ? "active" : ""} aria-pressed={active} onClick={() => toggleContract(option.value)}>{option.label}{option.value !== "all" && hasSearched && <span>{categoryCounts[option.value] ?? 0}</span>}</button>;
+                const count = option.value === "all" ? availableOffers.length : categoryCounts[option.value] ?? 0;
+                return <button key={option.value} type="button" className={active ? "active" : ""} aria-pressed={active} onClick={() => toggleContract(option.value)}>{option.label}{hasSearched && <span>{count}</span>}</button>;
               })}
             </div>
             <label className="select-field"><span>Expérience</span><select value={experience} onChange={(event) => changeExperience(event.target.value as ExperienceFilter)}>{experienceOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>

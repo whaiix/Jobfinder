@@ -94,7 +94,7 @@ async function fetchVariant(
   }
   if (contract === "cdi") url.searchParams.set("typeContrat", "CDI");
   if (contract === "cdd") url.searchParams.set("typeContrat", "CDD");
-  url.searchParams.set("range", `0-${Math.min(query.limit, 49)}`);
+  url.searchParams.set("range", "0-149");
 
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
@@ -121,9 +121,7 @@ export async function searchFranceTravail(query: JobSearchQuery): Promise<JobOff
   const locations = splitSearchTerms(query.location);
   const effectiveJobs = jobs.length > 0 ? jobs : [""];
   const effectiveLocations = locations.length > 0 ? locations : [""];
-  const contractVariants: Array<ContractType | undefined> = query.contracts.length > 0
-    ? query.contracts
-    : [undefined];
+  const contractVariants: Array<ContractType | undefined> = [undefined, ...query.contracts];
   const [token, communeCodes] = await Promise.all([
     getAccessToken(),
     Promise.all(effectiveLocations.map(resolveCommuneCode)),
@@ -146,7 +144,5 @@ export async function searchFranceTravail(query: JobSearchQuery): Promise<JobOff
   }
   const deduplicated = new Map(batches.flat().map((offer) => [offer.id, offer]));
 
-  return [...deduplicated.values()]
-    .filter((offer) => query.contracts.length === 0 || query.contracts.includes(offer.contract))
-    .slice(0, query.limit * 3);
+  return [...deduplicated.values()];
 }

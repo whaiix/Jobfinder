@@ -53,9 +53,7 @@ export async function searchWeb(query: JobSearchQuery): Promise<JobOffer[]> {
     ? [...new Set(jobGroups.flat())].map((job) => [job])
     : [["emploi"]];
   const pagesPerGroup = Math.max(1, Math.ceil(10 / effectiveGroups.length));
-  const contractVariants: Array<ContractType | undefined> = query.contracts.length
-    ? query.contracts
-    : [undefined];
+  const contractVariants: Array<ContractType | undefined> = [undefined, ...query.contracts];
   const pages = await Promise.all(contractVariants.flatMap((contract) =>
     effectiveGroups.flatMap((jobs) => {
       const search = buildQuery(query, jobs, contract);

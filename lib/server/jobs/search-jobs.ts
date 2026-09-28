@@ -43,9 +43,12 @@ export async function searchJobs(query: JobSearchQuery): Promise<JobSearchResult
       }
     });
 
-    const uniqueOffers = filterAndSortOffers(deduplicateOffers(enrichUnknownEmployers(liveOffers)), query).slice(
-      0,
-      query.limit,
+    // Les contrats sont filtrés dans l'interface à partir d'un catalogue commun.
+    // Cela garantit que sélectionner plusieurs contrats produit bien une union
+    // et permet de conserver des compteurs stables pour chaque catégorie.
+    const uniqueOffers = filterAndSortOffers(
+      deduplicateOffers(enrichUnknownEmployers(liveOffers)),
+      { ...query, contracts: [] },
     );
     if (uniqueOffers.length > 0) {
       if (isDatabaseConfigured()) {
