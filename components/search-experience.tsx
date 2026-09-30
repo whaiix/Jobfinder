@@ -18,7 +18,8 @@ const PROFILE_KEY = "jobpilot-profile-v1";
 const contractOptions: Array<{ value: ContractType | "all"; label: string }> = [
   { value: "all", label: "Tous" }, { value: "cdi", label: "CDI" },
   { value: "cdd", label: "CDD" }, { value: "alternance", label: "Alternance" },
-  { value: "stage", label: "Stage" },
+  { value: "stage", label: "Stage" }, { value: "interim", label: "Intérim" },
+  { value: "other", label: "Autres" },
 ];
 const experienceOptions: Array<{ value: ExperienceFilter; label: string }> = [
   { value: "all", label: "Toute expérience" }, { value: "0-1", label: "0–1 an" },
@@ -73,6 +74,8 @@ export function SearchExperience({ initialOffers }: Props) {
   const [copied, setCopied] = useState(false);
   const assistantRef = useRef<HTMLDivElement>(null);
   const searchRequestRef = useRef(0);
+  const searchAbortRef = useRef<AbortController | null>(null);
+  const contractsRef = useRef<ContractType[]>([]);
   const [searchMeta, setSearchMeta] = useState<SearchMeta>({ mode: "empty", sources: [], warnings: [] });
 
   useEffect(() => {
@@ -81,8 +84,13 @@ export function SearchExperience({ initialOffers }: Props) {
       const requestedJob = new URLSearchParams(window.location.search).get("metier");
       if (requestedJob) setJobs([requestedJob]); else if (saved?.jobs) setJobs(saved.jobs);
       if (saved?.cities) setCities(saved.cities);
-      if (saved?.contracts) setContracts(saved.contracts);
-      else if (saved?.contract && saved.contract !== "all") setContracts([saved.contract]);
+      if (saved?.contracts) {
+        setContracts(saved.contracts);
+        contractsRef.current = saved.contracts;
+      } else if (saved?.contract && saved.contract !== "all") {
+        setContracts([saved.contract]);
+        contractsRef.current = [saved.contract];
+      }
       if (saved?.experience) setExperience(saved.experience);
       if (typeof saved?.exactTitle === "boolean") setExactTitle(saved.exactTitle);
       const profile = parseStoredProfile(localStorage.getItem(PROFILE_KEY));
@@ -91,6 +99,8 @@ export function SearchExperience({ initialOffers }: Props) {
       setTrackedOffers(parseTrackedOffers(localStorage.getItem(TRACKING_KEY)));
     } catch { /* Une préférence corrompue est simplement ignorée. */ }
   }, []);
+
+  useEffect(() => () => searchAbortRef.current?.abort(), []);
 
   useEffect(() => {
     const term = cityDraft.trim();
@@ -157,33 +167,45 @@ export function SearchExperience({ initialOffers }: Props) {
     }
   }
 
-  async function runSearch(selection: SearchSelection, preservedOffers: JobOffer[] = []) {
+  async function runSearch(selection: SearchSelection) {
     const requestId = ++searchRequestRef.current;
     const { jobs: nextJobs, cities: nextCities, contracts: nextContracts, experience: nextExperience, exactTitle: nextExactTitle } = selection;
+    contractsRef.current = nextContracts;
     setJobs(nextJobs); setCities(nextCities); setJobDraft(""); setCityDraft("");
     const preferences: Preferences = { jobs: nextJobs, cities: nextCities, contracts: nextContracts, experience: nextExperience, exactTitle: nextExactTitle };
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
     setLoading(true); setHasSearched(true);
-    const params = new URLSearchParams({ q: nextJobs.join(","), location: nextCities.join(","), contract: nextContracts.length ? nextContracts.join(",") : "all", experience: nextExperience, exact: String(nextExactTitle) });
+    // Le serveur récupère un catalogue commun. Les contrats sont ensuite filtrés
+    // instantanément côté navigateur, sans relancer toutes les API externes.
+    const params = new URLSearchParams({ q: nextJobs.join(","), location: nextCities.join(","), contract: "all", experience: nextExperience, exact: String(nextExactTitle) });
     const appliedIds = new Set(parseTrackedOffers(localStorage.getItem(TRACKING_KEY)).filter((item) => item.status === "applied").map((item) => item.offer.id));
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 35_000);
     try {
-      const response = await fetch(`/api/jobs/search?${params.toString()}`);
-      const data = (await response.json()) as { offers: JobOffer[]; meta: SearchMeta };
-      if (!response.ok) throw new Error("La recherche n’a pas pu être effectuée.");
+      const response = await fetch(`/api/jobs/search?${params.toString()}`, { signal: controller.signal });
+      const data = await response.json().catch(() => null) as { offers?: JobOffer[]; meta?: SearchMeta; error?: string } | null;
+      if (!response.ok || !data?.offers || !data.meta) {
+        throw new Error(data?.error || (response.status === 504 ? "La recherche a pris trop de temps. Réessayez dans quelques secondes." : "La recherche n’a pas pu être effectuée."));
+      }
       if (requestId !== searchRequestRef.current) return;
-      const merged = [...new Map([...preservedOffers, ...data.offers].map((offer) => [offer.id, offer])).values()];
-      const scored = merged.filter((offer) => !appliedIds.has(offer.id)).map((offer) => ({ ...offer, compatibilityScore: calculateCvCompatibility(offer, profileData.cvText) }))
+      const scored = data.offers.filter((offer) => !appliedIds.has(offer.id)).map((offer) => ({ ...offer, compatibilityScore: calculateCvCompatibility(offer, profileData.cvText) }))
         .sort((left, right) => (right.compatibilityScore ?? 0) - (left.compatibilityScore ?? 0) || Date.parse(right.publishedAt) - Date.parse(left.publishedAt));
       setAvailableOffers(scored);
-      setOffers(filterOffersByContracts(scored, nextContracts));
+      setOffers(filterOffersByContracts(scored, contractsRef.current));
       setSearchMeta(data.meta);
     } catch (error) {
       if (requestId !== searchRequestRef.current) return;
-      const fallbackOffers = preservedOffers.filter((offer) => !appliedIds.has(offer.id));
-      setAvailableOffers(fallbackOffers);
-      setOffers(filterOffersByContracts(fallbackOffers, nextContracts));
-      setSearchMeta({ mode: fallbackOffers.length ? "live" : "empty", sources: [], warnings: [error instanceof Error ? error.message : "Erreur de recherche."] });
-    } finally { if (requestId === searchRequestRef.current) setLoading(false); }
+      const message = error instanceof DOMException && error.name === "AbortError"
+        ? "La recherche a pris trop de temps. Réessayez avec moins de métiers ou de villes."
+        : error instanceof Error ? error.message : "Erreur de recherche.";
+      setSearchMeta((current) => ({ ...current, warnings: [message] }));
+    } finally {
+      window.clearTimeout(timeout);
+      if (searchAbortRef.current === controller) searchAbortRef.current = null;
+      if (requestId === searchRequestRef.current) setLoading(false);
+    }
   }
 
   async function search(event?: FormEvent) {
@@ -195,11 +217,10 @@ export function SearchExperience({ initialOffers }: Props) {
 
   function toggleContract(value: ContractType | "all") {
     const nextContracts = value === "all" ? [] : contracts.includes(value) ? contracts.filter((item) => item !== value) : [...contracts, value];
+    contractsRef.current = nextContracts;
     setContracts(nextContracts);
-    if (hasSearched) {
-      setOffers(filterOffersByContracts(availableOffers, nextContracts));
-      void runSearch({ jobs, cities, contracts: nextContracts, experience, exactTitle }, availableOffers);
-    }
+    localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ jobs, cities, contracts: nextContracts, experience, exactTitle } satisfies Preferences));
+    if (hasSearched) setOffers(filterOffersByContracts(availableOffers, nextContracts));
   }
 
   function changeExperience(value: ExperienceFilter) {
@@ -274,12 +295,13 @@ export function SearchExperience({ initialOffers }: Props) {
 
         <>
           <div className="results-header">
-            <div><p className="eyebrow">Résultats</p><h2>{hasSearched ? `${offers.length} offre${offers.length > 1 ? "s" : ""} compatible${offers.length > 1 ? "s" : ""}` : "Lancez votre recherche"}</h2></div>
+            <div><p className="eyebrow">Résultats</p><h2 aria-live="polite">{loading ? "Recherche des offres en cours…" : hasSearched ? `${offers.length} offre${offers.length > 1 ? "s" : ""} compatible${offers.length > 1 ? "s" : ""}` : "Lancez votre recherche"}</h2></div>
             <div className="result-notes">{exactTitle && <span>Intitulé exact</span>}<span>30 jours maximum</span><span>{searchMeta.mode === "live" ? `${searchMeta.sources.join(" + ")} en direct` : searchMeta.mode === "database" ? "Résultats enregistrés" : searchMeta.sources.length ? `${searchMeta.sources.join(" + ")} consultés` : "Sources officielles"}</span></div>
           </div>
           {searchMeta.warnings.length > 0 && <div className="search-warning" role="status">{searchMeta.warnings.join(" · ")}</div>}
 
           <div className="offer-list">
+            {loading && offers.length === 0 && <div className="empty-state" role="status"><span>⌕</span><h3>Nous interrogeons les sources</h3><p>France Travail, Adzuna et les résultats web sont consultés. Cela peut prendre quelques secondes.</p></div>}
             {offers.map((offer) => {
               const trackingStatus = trackedOffers.find((item) => item.offer.id === offer.id)?.status;
               return <article className="offer-card" key={offer.id}>

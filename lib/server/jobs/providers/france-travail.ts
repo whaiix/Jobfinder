@@ -38,6 +38,7 @@ async function getAccessToken(): Promise<string> {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
     cache: "no-store",
+    signal: AbortSignal.timeout(8_000),
   });
   const payload = (await response.json()) as TokenResponse;
   if (!response.ok || !payload.access_token) {
@@ -65,7 +66,7 @@ async function resolveCommuneCode(location: string): Promise<string | null> {
   url.searchParams.set("boost", "population");
   url.searchParams.set("limit", "1");
 
-  const response = await fetch(url, { cache: "force-cache" });
+  const response = await fetch(url, { cache: "force-cache", signal: AbortSignal.timeout(5_000) });
   if (!response.ok) return null;
   const communes = (await response.json()) as Array<{ code?: string }>;
   return communes[0]?.code ?? null;
@@ -99,6 +100,7 @@ async function fetchVariant(
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     cache: "no-store",
+    signal: AbortSignal.timeout(8_000),
   });
   if (response.status === 429 && attempt < 2) {
     await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
